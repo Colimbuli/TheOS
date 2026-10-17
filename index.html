@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>TheOS – Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0f1a; overflow: hidden;
+    touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  #wrap { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #screen { display: block; background: #000; outline: none; image-rendering: pixelated; image-rendering: crisp-edges; }
+
+  #touch { display: none; }
+  body.touch #touch { display: flex; justify-content: space-between; align-items: center;
+    width: 100%; max-width: 560px; height: 200px; padding: 0 24px; box-sizing: border-box; }
+  @media (orientation: landscape) {
+    body.touch #touch { position: fixed; left: 0; right: 0; bottom: 8px; max-width: none; pointer-events: none; opacity: .6; }
+    body.touch #touch > * { pointer-events: auto; }
+  }
+  #dpad { position: relative; width: 140px; height: 140px; touch-action: none; }
+  #dpad .arm { position: absolute; background: #2a3148; border: 3px solid #0e1220; border-radius: 10px; }
+  #dpad .h { left: 0; right: 0; top: 46px; height: 42px; }
+  #dpad .v { top: 0; bottom: 0; left: 46px; width: 42px; }
+  #btns { display: flex; gap: 18px; align-items: center; transform: rotate(-18deg); }
+  .btn { width: 68px; height: 68px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font: 18px "Press Start 2P", monospace; color: #fff; border: 3px solid #0e1220; touch-action: none; }
+  #btnA { background: #c8384a; margin-top: -30px; }
+  #btnB { background: #3a58c8; margin-top: 30px; }
+  .btn.on { filter: brightness(1.4); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="screen" tabindex="0"></canvas>
+  <div id="touch">
+    <div id="dpad"><div class="arm h"></div><div class="arm v"></div></div>
+    <div id="btns"><div class="btn" id="btnB">B</div><div class="btn" id="btnA">A</div></div>
+  </div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
