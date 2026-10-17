@@ -42,6 +42,10 @@ export const sfx = {
   dig: () => { tone(140, 0.07, { type: 'square', vol: 0.05 }); tone(110, 0.08, { type: 'square', vol: 0.05, when: 0.09 }); },
   invisOn: () => tone(1200, 0.3, { type: 'sine', vol: 0.06, slide: 300 }),
   invisOff: () => tone(300, 0.25, { type: 'sine', vol: 0.06, slide: 1100 }),
+  pop: () => { tone(500, 0.06, { vol: 0.06, slide: 1400 }); tone(1600, 0.05, { vol: 0.04, when: 0.06 }); },
+  hit: () => tone(180, 0.07, { vol: 0.05, slide: 120 }),
+  fire: () => tone(160, 0.25, { type: 'sawtooth', vol: 0.04, slide: 60 }),
+  door: () => tone(70, 0.45, { type: 'sawtooth', vol: 0.05, slide: 110 }),
   swap: () => { tone(500, 0.05); tone(750, 0.06, { when: 0.05 }); },
   start: () => [392, 523, 659, 784].forEach((f, i) => tone(f, 0.09, { when: i * 0.07 })),
 };

@@ -1,7 +1,8 @@
 // TheOS – Kapitel 1 "Die Gefährten"
 // Interne Auflösung 240x160 (wie der GBA), ganzzahlig hochskaliert.
 
-import { initInput, pollInput, input, isTouch } from './input.js';
+import { initInput, pollInput, input, isTouch, endFrame } from './input.js';
+import { createChapter2 } from './fps/chapter2.js';
 import { sfx, unlockAudio } from './audio.js';
 import { createWorld, drawTiles, T, TILE, MAP_W, MAP_H, COL } from './world.js';
 import { charSprite, heartSprite, itemSprite } from './sprites.js';
@@ -53,7 +54,19 @@ function newGame() {
     banners: [],
     shieldT: 0, shieldCD: 0, invisT: 0, actT: 0, hurtT: 0,
     bushes: 0, treasures: 0,
+    menu: 0, menuHeld: false,
+    fps: null,
   };
+}
+
+// Kapitel 2 (Ego-Perspektive). Ohne Spielstand aus Kapitel 1 startet die Gruppe auf Level 3.
+function startChapter2(stats) {
+  const st = stats ? { ...stats } : { hearts: 5, maxHearts: 5, level: 3, xp: 0 };
+  st.hearts = st.maxHearts;
+  game.stats = st;
+  game.fps = createChapter2({ stats: st, sfx });
+  game.state = 'fps';
+  dialog.active = false;
 }
 
 const needXP = (lvl) => 10 + lvl * 10;
@@ -207,6 +220,9 @@ function update(dt) {
 
   if (game.state === 'title') {
     game.titleT += dt;
+    if (input.dir.y && !game.menuHeld) { game.menu = (game.menu + 1) % 2; sfx.blip(); }
+    game.menuHeld = !!input.dir.y;
+    if ((input.aPressed || tap) && game.menu === 1) { sfx.start(); startChapter2(); return; }
     if (input.aPressed || tap) {
       sfx.start();
       game.state = 'play';
@@ -221,6 +237,18 @@ function update(dt) {
   }
 
   if (game.state === 'end') {
+    game.endT += dt;
+    if (game.endT > 1.5 && (input.aPressed || tap)) { sfx.start(); startChapter2(game.stats); }
+    return;
+  }
+
+  if (game.state === 'fps') {
+    game.fps.update(dt);
+    if (game.fps.finished) { game.state = 'fpsEnd'; game.endT = 0; if (document.exitPointerLock) document.exitPointerLock(); }
+    return;
+  }
+
+  if (game.state === 'fpsEnd') {
     game.endT += dt;
     if (game.endT > 1.5 && (input.aPressed || tap)) newGame();
     return;
@@ -679,7 +707,35 @@ function text(str, x, y, o = {}) {
   vctx.fillText(str, px, py);
 }
 
+function renderFPS() {
+  game.fps.renderLow(g);
+  if (game.state === 'fpsEnd') {
+    g.fillStyle = `rgba(8,10,24,${Math.min(0.88, game.endT)})`;
+    g.fillRect(0, 0, W, H);
+  }
+  vctx.imageSmoothingEnabled = false;
+  vctx.drawImage(low, 0, 0, W * K, H * K);
+  if (game.state === 'fps') { game.fps.renderUI(text); return; }
+  if (game.endT < 0.6) return;
+  const sm = game.fps.summary, st = game.stats;
+  text('ENDE KAPITEL 2', W / 2, 18, { size: 12, align: 'center', color: '#f8d848' });
+  text('Die Höhle im Buttenberg ist geschafft!', W / 2, 40, { size: 6, align: 'center' });
+  const rows = [
+    ['Gegner', `${sm.kills} / ${sm.totalEnemies}`],
+    ['Kristalle', `${sm.crystals} / ${sm.totalCrystals}`],
+    ['Geheimgang', sm.secret ? 'gefunden!' : 'nicht gefunden'],
+    ['Level', String(st.level)],
+  ];
+  rows.forEach(([a, b], i) => {
+    text(a, 56, 58 + i * 12, { size: 7, color: '#b8c8e8' });
+    text(b, 184, 58 + i * 12, { size: 7, align: 'right', color: '#a8f070' });
+  });
+  text('Fortsetzung folgt: Die Drachenhöhle', W / 2, 116, { size: 6, align: 'center' });
+  if (game.endT > 1.5 && Math.floor(game.time * 2) % 2 === 0) text('A: Zum Titelbild', W / 2, 136, { size: 6, align: 'center', color: '#a8f070' });
+}
+
 function render() {
+  if (game.state === 'fps' || game.state === 'fpsEnd') { renderFPS(); return; }
   const cam = camera();
   renderWorld(cam);
 
@@ -697,11 +753,14 @@ function render() {
 
   if (game.state === 'title') {
     text('THEOS', W / 2, 26, { size: 24, align: 'center', color: '#f8d848' });
-    text('Kapitel 1', W / 2, 60, { size: 7, align: 'center', color: '#b8c8e8' });
-    text('Die Gefährten', W / 2, 72, { align: 'center' });
-    text('- Demo -', W / 2, 88, { size: 6, align: 'center', color: '#b8c8e8' });
+    text('Theo und der Drache vom Buttenberg', W / 2, 62, { size: 6, align: 'center', color: '#e8f0ff' });
+    const items = ['Kapitel 1: Die Gefährten', 'Kapitel 2: Der Buttenberg'];
+    items.forEach((it, i) => {
+      const sel = i === game.menu;
+      text((sel ? '> ' : '  ') + it, 32, 96 + i * 12, { size: 7, color: sel ? '#f8d848' : '#b8c8e8' });
+    });
     if (Math.floor(game.time * 2) % 2 === 0) {
-      text(isTouch() ? 'Tippe A zum Starten' : 'Leertaste / A: Start', W / 2, 124, { size: 7, align: 'center', color: '#a8f070' });
+      text(isTouch() ? 'Steuerkreuz wählen, A starten' : 'Hoch/Runter wählen, Leertaste/A starten', W / 2, 136, { size: 5, align: 'center', color: '#a8f070' });
     }
     return;
   }
@@ -712,9 +771,9 @@ function render() {
       text('ENDE KAPITEL 1', W / 2, 24, { size: 12, align: 'center', color: '#f8d848' });
       text('Die Gefährten sind vereint!', W / 2, 50, { size: 7, align: 'center' });
       text(`Level ${st.level} · Büsche ${game.bushes} · Schätze ${game.treasures}`, W / 2, 68, { size: 6, align: 'center', color: '#a8f070' });
-      text('Fortsetzung folgt:', W / 2, 94, { size: 7, align: 'center', color: '#b8c8e8' });
-      text('Der Weg zum Buttenberg', W / 2, 106, { size: 8, align: 'center' });
-      if (game.endT > 1.5 && Math.floor(game.time * 2) % 2 === 0) text('A: Nochmal spielen', W / 2, 136, { size: 6, align: 'center', color: '#a8f070' });
+      text('Als Nächstes:', W / 2, 94, { size: 7, align: 'center', color: '#b8c8e8' });
+      text('Die Höhle im Buttenberg', W / 2, 106, { size: 8, align: 'center' });
+      if (game.endT > 1.5 && Math.floor(game.time * 2) % 2 === 0) text('A: Weiter zum Buttenberg!', W / 2, 136, { size: 6, align: 'center', color: '#a8f070' });
     }
     return;
   }
@@ -764,6 +823,7 @@ function loop(now) {
   last = now;
   update(dt);
   render();
+  endFrame();
   requestAnimationFrame(loop);
 }
 
@@ -775,7 +835,11 @@ async function boot() {
   view.addEventListener('pointerdown', () => {
     view.focus();
     unlockAudio();
-    if (game.state === 'title' || game.state === 'end') canvasTap = true;
+    if (game.state === 'title' || game.state === 'end' || game.state === 'fpsEnd') canvasTap = true;
+    // Ego-Perspektive: Maus fangen, damit man mit ihr umschauen kann (Esc gibt sie frei)
+    if (game.state === 'fps' && !isTouch() && !document.pointerLockElement && view.requestPointerLock) {
+      try { const r = view.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch { /* im iframe evtl. gesperrt */ }
+    }
   });
   try { await document.fonts.load(`16px ${FONT}`); } catch { /* Fallback-Schrift */ }
   view.focus();
