@@ -1,95 +1,143 @@
-// Dorfbewohner von Lindental und ihre Dialoge.
-// quest: 0 = noch nicht angenommen, 1 = Flocke suchen, 2 = Flocke folgt dir, 3 = erledigt
+// Bewohner von Lindental, Gefährten und alle Dialoge von Kapitel 1.
+//
+// game.step:
+//   0 Felix finden            1 Kastanienprobe läuft     2 Felix dabei – Arne abholen
+//   3 Arne dabei – Mama fragen 4 Tarnumhang suchen        5 Umhang gefunden – zu Mama
+//   6 Friedrich dabei – zum Torhebel schleichen            7 Tor offen – ab nach Norden
 
 const T = 16;
 
+export const HEROES = {
+  theo:      { name: 'Theo', ability: 'Schild' },
+  felix:     { name: 'Felix', ability: 'Stärke' },
+  arne:      { name: 'Arne', ability: 'Graben' },
+  friedrich: { name: 'Friedrich', ability: 'Unsichtbar' },
+};
+
 export function createNPCs() {
   return [
-    { id: 'hilde', pal: 'elder', x: 6 * T, y: 9 * T, dir: 0 },
+    { id: 'felix', pal: 'felix', x: 6 * T, y: 9 * T, dir: 0 },
+    { id: 'mama', pal: 'mama', x: 11 * T + 2, y: 9 * T, dir: 0 },
+    { id: 'friedrich', pal: 'friedrich', x: 8 * T + 6, y: 9 * T + 4, dir: 0 },
     { id: 'lotte', pal: 'merchant', x: 20 * T + 8, y: 150, dir: 0 },
-    { id: 'tim', pal: 'kid', x: 18 * T, y: 14 * T, dir: 0, wander: { x0: 12 * T, y0: 9 * T, x1: 19 * T, y1: 15 * T }, t: 1 },
     { id: 'konrad', pal: 'guard', x: 14 * T, y: 3 * T, dir: 0, spear: true },
   ].map((n) => ({ anim: 0, moving: false, ...n }));
 }
 
+export const STEP_HINT = [
+  'Quest: Überzeuge Felix',
+  'Quest: Halte 5 Kastanien auf',
+  'Quest: Hol Arne ab',
+  'Quest: Frag Mama wegen Friedrich',
+  'Quest: Hol den Tarnumhang',
+  'Quest: Bring Mama den Umhang',
+  'Quest: Unsichtbar zum Torhebel',
+  'Ziel: Zum Buttenberg (Norden)',
+];
+
 // Liefert { lines, after } – after() läuft, wenn der Dialog geschlossen wird.
 export function talkTo(n, game, fx) {
-  const q = game.quest;
+  const s = game.step;
   switch (n.id) {
-    case 'hilde':
-      if (q === 0) return {
+    case 'felix':
+      if (s === 0) return {
         lines: [
-          'Oma Hilde: Ach, wie gut, dass du kommst!',
-          'Meine Katze Flocke ist schon wieder ausgebüxt.',
-          'Sie versteckt sich gern im Garten im Südwesten, hinter den Büschen.',
-          'Bringst du sie mir zurück? Dann rede ich mit Konrad am Tor.',
+          'Theo: Felix! Kommst du mit zum Buttenberg? Wir besiegen den bösen Drachen!',
+          'Felix: Den Drachen?! Hm... nur wenn du wirklich mutig bist.',
+          'Felix: Ich werfe Kastanien nach dir. Halte 5 Stück mit deinem Schutzschild auf!',
+          'Drück B, um den Schild zu bauen – genau dann, wenn eine Kastanie kommt!',
         ],
-        after() {
-          game.quest = 1;
-          fx.sfx.confirm();
-          fx.banner('NEUE QUEST', 'Finde Flocke, die Katze', '#88e0ff');
-        },
+        after() { game.step = 1; fx.startChallenge(); },
       };
-      if (q === 1) return { lines: [
-        'Oma Hilde: Schau mal im Garten im Südwesten nach.',
-        'Die Büsche davor kannst du mit deinem Stock wegschlagen.',
+      if (game.challenge.active) return { lines: ['Felix: Konzentrier dich! Schild hoch mit B!'] };
+      return {
+        lines: ['Felix: Nochmal? Okay – fünf Kastanien. Los geht\'s!'],
+        after() { fx.startChallenge(); },
+      };
+
+    case 'mama':
+      if (s < 3) return { lines: [
+        'Mama: Theo! Was hast du denn heute vor?',
+        'Theo: Ein Abenteuer! Aber zuerst brauche ich meine Freunde.',
+        'Mama: Na dann. Zum Abendessen bist du zurück!',
       ] };
-      if (q === 2) return {
+      if (s === 3 && !game.hasCloak) return {
         lines: [
-          'Oma Hilde: Flocke! Da bist du ja, du kleine Ausreißerin!',
-          'Danke dir! Ich sage Konrad sofort Bescheid.',
-          'Das Tor zum Flüsterwald steht dir jetzt offen.',
+          'Theo: Mama, darf Friedrich mitkommen? Wir gehen zum Buttenberg!',
+          'Mama: Zum Buttenberg? Nur wenn ihr zusammenbleibt – und Friedrich seinen Tarnumhang mitnimmt.',
+          'Mama: Aber der ist gestern über den Zaun in Oma Hildes Garten geweht. Und Oma Hilde ist verreist...',
+        ],
+        after() { game.step = 4; fx.banner('NEUE QUEST', 'Hol den Tarnumhang aus dem Garten', '#88e0ff'); },
+      };
+      if (s === 4) return { lines: ['Mama: Oma Hildes Garten ist im Südwesten. Das Gartentor ist leider abgeschlossen.'] };
+      if (s === 5 || (s === 3 && game.hasCloak)) return {
+        lines: [
+          'Theo: Hier ist Friedrichs Tarnumhang!',
+          'Mama: Prima. Dann darf Friedrich mit. Passt gut auf ihn auf!',
+          'Friedrich: JAAA! Mit dem Umhang kann ich mich unsichtbar machen!',
         ],
         after() {
-          game.quest = 3;
-          fx.returnCat();
-          fx.openGate();
+          fx.join('friedrich');
+          game.step = 6;
           fx.sfx.item();
-          fx.banner('QUEST ERFÜLLT', 'Das Tor im Norden ist offen', '#a8f070');
-          fx.gainXP(25, n.x + 8, n.y);
+          fx.banner('FRIEDRICH IST DABEI', 'B: unsichtbar werden', '#a8f070');
+          fx.gainXP(15, n.x + 8, n.y);
         },
       };
-      return { lines: ['Oma Hilde: Pass gut auf dich auf da draußen im Flüsterwald!'] };
+      return { lines: ['Mama: Und denkt an eure Jacken!'] };
 
-    case 'lotte':
-      if (q === 1) return { lines: [
-        'Lotte: Eine weiße Katze? Die ist vorhin Richtung Garten geflitzt.',
-        'Ganz im Südwesten, hinter dem Zaun.',
+    case 'friedrich':
+      if (s < 3) return { lines: [
+        'Friedrich: Theo, ich will auch mit! Bitte, bitte, bitte!',
+        'Theo: Erst brauche ich Felix und Arne. Dann sehen wir weiter.',
       ] };
-      return { lines: [
-        'Lotte: Frische Äpfel! Süßes Brot!',
-        'Leider hat der Händlerkarren aus der Stadt noch nicht geliefert. Komm später wieder!',
-      ] };
+      return { lines: ['Friedrich: Frag Mama! Ich hab schon meine Schuhe an!'] };
 
-    case 'tim':
-      if (q === 3) return { lines: ['Tim: Du darfst in den Flüsterwald?! Wow... nimm mich nächstes Mal mit!'] };
-      return { lines: [
-        'Tim: Hey! Wusstest du, dass man Büsche mit dem Stock umhauen kann?',
-        'Drück B (oder J / X). Das gibt sogar Erfahrung!',
-      ] };
+    case 'lotte': {
+      const tips = [
+        'Lotte: Felix? Der übt gerade Kastanien-Weitwurf vor seinem Haus.',
+        'Lotte: Felix? Der übt gerade Kastanien-Weitwurf vor seinem Haus.',
+        'Lotte: Arne sitzt fest – seit dem Sturm liegt ein Felsbrocken vor seiner Tür! Wer stark ist, schiebt ihn zur Seite.',
+        'Lotte: Deine Mama hat vorhin nach Friedrich gerufen.',
+        'Lotte: Oma Hildes Garten? Die Erde unter dem Zaun ist ganz locker...',
+        'Lotte: Ein Tarnumhang? Na, dann schnell zu deiner Mama!',
+        'Lotte: Konrad lässt niemanden durch. Aber wen er nicht sieht, den hält er auch nicht auf...',
+        'Lotte: Viel Glück gegen den Drachen! Ich halte euch frische Äpfel bereit.',
+      ];
+      return { lines: [tips[s]] };
+    }
 
     case 'konrad':
-      if (game.world.gateOpen) return { lines: [
-        'Wache Konrad: Oma Hilde hat sich für dich verbürgt. Das Tor ist offen.',
-        'Viel Glück, Abenteurer!',
-      ] };
+      if (game.world.gateOpen) return { lines: ['Wache Konrad: Vier kleine Helden... Passt bloß auf euch auf am Buttenberg!'] };
       return { lines: [
-        'Wache Konrad: Halt! Hinter dem Tor liegt der Flüsterwald.',
-        'Dort ist es zu gefährlich für Anfänger. Hilf erst den Leuten im Dorf!',
+        'Wache Konrad: Halt! Zum Buttenberg lasse ich keine Kinder durch.',
+        'Wache Konrad: Da oben wohnt ein Drache! Das Tor bleibt zu.',
       ] };
   }
   return { lines: ['...'] };
 }
 
-export function catDialog(game, fx) {
-  if (game.quest === 1) return {
-    lines: ['Miau! Das muss Flocke sein!', 'Flocke folgt dir jetzt.'],
+export function arneDoor(game, fx) {
+  return {
+    lines: [
+      '*klopf klopf*',
+      'Arne: Endlich! Seit dem Sturm lag der Fels vor meiner Tür. Danke, Felix!',
+      'Theo: Kommst du mit zum Buttenberg? Wir besiegen den Drachen!',
+      'Arne: Klar! Und wenn wir irgendwo nicht weiterkommen – ich buddel uns einfach ein Loch.',
+    ],
     after() {
-      game.quest = 2;
-      game.cat.follow = true;
+      fx.join('arne');
+      game.step = 3;
       fx.sfx.item();
-      fx.banner('FLOCKE GEFUNDEN', 'Bring sie zu Oma Hilde', '#88e0ff');
+      fx.banner('ARNE IST DABEI', 'B: Löcher buddeln', '#a8f070');
+      fx.gainXP(15);
     },
   };
-  return { lines: ['Miau! Eine weiße Katze. Am Halsband steht "Flocke".'] };
 }
+
+export const LEVER_DIALOG = [
+  '*Knarz!* Friedrich zieht am Hebel. Das Tor geht auf!',
+  'Wache Konrad: Huch?! Wer hat denn das Tor geöffnet?!',
+  'Theo: Wir! Wir sind zu viert und wir haben einen Plan.',
+  'Wache Konrad: ...Na gut, ihr kleinen Helden. Aber passt auf euch auf!',
+];

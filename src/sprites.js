@@ -19,15 +19,34 @@ function rows(list, width) {
   });
 }
 
-// --- Figuren (16x16) --------------------------------------------------------
+// --- Figuren-Bausteine (16 breit) ---------------------------------------------
 
-const BODY_FRONT = ['2.o10co2.', '.o12co.', '.o5c2k5co.', '.os10Cso.', '2.o10Co2.'];
-const BODY_SIDE = ['3.o8co3.', '3.o8co3.', '3.o3c2k3co3.', '3.o3c2s3co3.', '3.o8Co3.'];
+const HEADS = {
+  normal: {
+    down: ['5.6o5.', '4.o6ho4.', '3.o8ho3.', '2.o10ho2.', '2.oh8sho2.', '2.o2se4se2so2.', '2.o10so2.', '3.2o6s2o3.'],
+    up: ['5.6o5.', '4.o6ho4.', '3.o8ho3.', '2.o10ho2.', '2.o10ho2.', '2.o10ho2.', '2.o10ho2.', '3.2o6h2o3.'],
+    side: ['6.5o5.', '5.o5ho4.', '4.o7ho3.', '3.o9ho2.', '3.o4h5so2.', '3.o3h4seso2.', '3.o2h7so2.', '4.2o4s2o4.'],
+  },
+  // Locken: buschiger Umriss, zweifarbiges Haar (h/H)
+  curly: {
+    down: ['2.2o.2o2.2o.2o2.', '.oHhHhHhHhHhHho.', 'ohHhHhHhHhHhHhHo', 'oHhHhHhHhHhHhHho', 'oHho8soHho', '.2o2se4se2s2o.', '2.o10so2.', '3.2o6s2o3.'],
+    up: ['2.2o.2o2.2o.2o2.', '.oHhHhHhHhHhHho.', 'ohHhHhHhHhHhHhHo', 'oHhHhHhHhHhHhHho', 'ohHhHhHhHhHhHhHo', '.oHhHhHhHhHhHho.', '2.o10ho2.', '3.2o6h2o3.'],
+    side: ['4.2o.2o.2o4.', '3.oHhHhHhHhHo2.', '2.oHhHhHhHhHhHo.', '2.oHhHh6so2.', '3.oHh7so2.', '3.oHho4seso2.', '3.o2h7so2.', '4.2o4s2o4.'],
+  },
+};
 
-const HEAD = {
-  down: ['5.6o5.', '4.o6ho4.', '3.o8ho3.', '2.o10ho2.', '2.oh8sho2.', '2.o2se4se2so2.', '2.o10so2.', '3.2o6s2o3.'],
-  up: ['5.6o5.', '4.o6ho4.', '3.o8ho3.', '2.o10ho2.', '2.o10ho2.', '2.o10ho2.', '2.o10ho2.', '3.2o6h2o3.'],
-  side: ['6.5o5.', '5.o5ho4.', '4.o7ho3.', '3.o9ho2.', '3.o4h5so2.', '3.o3h4seso2.', '3.o2h7so2.', '4.2o4s2o4.'],
+const BODIES = {
+  normal: {
+    front: ['2.o10co2.', '.o12co.', '.o5c2k5co.', '.os10Cso.', '2.o10Co2.'],
+    back: ['2.o10co2.', '.o12co.', '.o5c2k5co.', '.os10Cso.', '2.o10Co2.'],
+    side: ['3.o8co3.', '3.o8co3.', '3.o3c2k3co3.', '3.o3c2s3co3.', '3.o8Co3.'],
+  },
+  // Sakko: Jacke j/J, weißes Hemd c, Krawatte K
+  jacket: {
+    front: ['2.o4j2c4jo2.', '.o5j2c5jo.', '.o5j2K5jo.', '.os4j2c4jso.', '2.o10Jo2.'],
+    back: ['2.o10jo2.', '.o12jo.', '.o12jo.', '.os10jso.', '2.o10Jo2.'],
+    side: ['3.o8jo3.', '3.o5j3co3.', '3.o5j2cKo3.', '3.o3j2s3jo3.', '3.o8Jo3.'],
+  },
 };
 
 const LEGS = {
@@ -43,12 +62,23 @@ const LEGS = {
   ],
 };
 
+const SKIN = '#f8c8a0', OUT = '#1a1020', EYE = '#2a1a10';
+
 export const PALETTES = {
-  hero:     { o: '#1a1020', h: '#6b3a1e', s: '#f8c8a0', e: '#2a1a10', c: '#3a7bd5', C: '#2a5aa5', k: '#8b5a2b', p: '#4a3a2a' },
-  elder:    { o: '#1a1020', h: '#e8e8f0', s: '#f0c098', e: '#2a1a10', c: '#9a5ab8', C: '#6a3a88', k: '#e0c060', p: '#6a3a88' },
-  merchant: { o: '#1a1020', h: '#d86a2a', s: '#f8c8a0', e: '#2a1a10', c: '#e0b030', C: '#b08020', k: '#7a4a20', p: '#5a4a3a' },
-  kid:      { o: '#1a1020', h: '#f0d060', s: '#f8d0a8', e: '#2a1a10', c: '#e05050', C: '#a83030', k: '#4a3a2a', p: '#3050a0' },
-  guard:    { o: '#1a1020', h: '#a0a8b8', s: '#e8b890', e: '#2a1a10', c: '#b03a3a', C: '#802a2a', k: '#3a3a3a', p: '#4a4a5a' },
+  theo:      { o: OUT, s: SKIN, e: EYE, h: '#6b3a1e', c: '#3a7bd5', C: '#2a5aa5', k: '#8b5a2b', p: '#4a3a2a' },
+  felix:     { o: OUT, s: '#f0c098', e: EYE, h: '#c08a3a', c: '#d84848', C: '#a02e2e', k: '#3a3030', p: '#3a4a7a' },
+  arne:      { o: OUT, s: SKIN, e: EYE, h: '#5a3418', H: '#8a5428', j: '#3a4a6a', J: '#283450', c: '#f4f4f4', K: '#c83040', p: '#2e2e3a' },
+  friedrich: { o: OUT, s: '#fcd4b0', e: EYE, h: '#f4d860', c: '#f0a030', C: '#c07818', k: '#6a4a2a', p: '#3a6ab0' },
+  mama:      { o: OUT, s: SKIN, e: EYE, h: '#4a2a1a', c: '#3aa8a0', C: '#2a7a74', k: '#e8d070', p: '#2a7a74' },
+  merchant:  { o: OUT, s: SKIN, e: EYE, h: '#d86a2a', c: '#e0b030', C: '#b08020', k: '#7a4a20', p: '#5a4a3a' },
+  guard:     { o: OUT, s: '#e8b890', e: EYE, h: '#a0a8b8', c: '#b03a3a', C: '#802a2a', k: '#3a3a3a', p: '#4a4a5a' },
+};
+
+// Körperbau je Figur: Friedrich klein, Felix groß, Arne mit Locken und Sakko
+const STYLE = {
+  felix: { tall: true },
+  arne: { head: 'curly', body: 'jacket' },
+  friedrich: { small: true },
 };
 
 const cache = new Map();
@@ -69,34 +99,44 @@ function render(map, pal, flip) {
   return c;
 }
 
-// dir: 0 runter, 1 hoch, 2 links, 3 rechts · frame: 0 stehen, 1/2 Schritt
+// dir: 0 runter, 1 hoch, 2 links, 3 rechts · frame: 0 stehen, 1/2 Schritt.
+// Liefert ein Canvas, dessen Unterkante auf den Füßen liegt (Höhe 14–18 px).
 export function charSprite(palName, dir, frame) {
   const key = `${palName}:${dir}:${frame}`;
   let c = cache.get(key);
   if (c) return c;
+  const st = STYLE[palName] || {};
   const side = dir >= 2;
-  const head = side ? HEAD.side : dir === 1 ? HEAD.up : HEAD.down;
-  const body = side ? BODY_SIDE : BODY_FRONT;
-  const legs = (side ? LEGS.side : LEGS.front)[frame];
+  const heads = HEADS[st.head || 'normal'];
+  const bodies = BODIES[st.body || 'normal'];
+  const head = [...(side ? heads.side : dir === 1 ? heads.up : heads.down)];
+  const body = [...(side ? bodies.side : dir === 1 ? bodies.back : bodies.front)];
+  const legs = [...(side ? LEGS.side : LEGS.front)[frame]];
+  if (st.small) { head.splice(2, 1); body.splice(1, 1); }      // 14 px hoch
+  if (st.tall) { body.splice(1, 0, body[1]); legs.unshift(legs[0]); } // 18 px hoch
   c = render(rows([...head, ...body, ...legs], 16), PALETTES[palName], dir === 2);
   cache.set(key, c);
   return c;
 }
 
-// --- Katze Flocke (16x10, schaut nach links) --------------------------------
+// --- Gegenstände --------------------------------------------------------------
 
-const CAT = ['2.o3.o9.', '.owo.owo8.', '.o6wo6.o', '.owe2wewo5.ow', '.o2wp3wo4.ow.',
-  '2.o4w7ow.', '2.o2w2g3wg3wo.', '2.o11wo.', '2.owo.owo2.owo2.', '2.2o2.2o3.2o3.'];
-const CAT_PAL = { o: '#3a2a2a', w: '#f4f0e8', g: '#c8b8a8', e: '#202020', p: '#f090a0' };
+const ITEMS = {
+  cloak: {
+    rows: ['3.4o3.', '2.o4mo2.', '.o3mM2mo.', '.o2mM3mo.', 'o3mM4mo', 'o2mM5mo', 'o8mo', '.8o.'],
+    w: 10, pal: { o: '#1a1020', m: '#7a4ac8', M: '#b090f0' },
+  },
+  chestnut: { rows: ['.2o.', 'obbo', 'obBo', '.2o.'], w: 4, pal: { o: '#2a1408', b: '#8a4a1a', B: '#c88040' } },
+};
 
-export function catSprite(facingRight) {
-  const key = `cat:${facingRight}`;
+export function itemSprite(name) {
+  const key = `item:${name}`;
   let c = cache.get(key);
-  if (!c) { c = render(rows(CAT, 16), CAT_PAL, facingRight); cache.set(key, c); }
+  if (!c) { const it = ITEMS[name]; c = render(rows(it.rows, it.w), it.pal, false); cache.set(key, c); }
   return c;
 }
 
-// --- Herzen (7x6) -----------------------------------------------------------
+// --- Herzen (7x6) -------------------------------------------------------------
 
 const HEART = ['.2o.2o.', 'owro2ro', 'o5ro', '.o3ro.', '2.oro2.', '3.o3.'];
 

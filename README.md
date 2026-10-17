@@ -5,20 +5,31 @@ Alle Grafiken und Sounds sind eigene Pixel-Art bzw. per Code erzeugt – keine f
 
 **Demo spielen:** https://colimbuli.github.io/TheOS/
 
-## Demo „Das Dorf Lindental“
+## Kapitel 1 „Die Gefährten“
 
-- Dorf mit 4 Bewohnern: Oma Hilde, Händlerin Lotte, Tim, Wache Konrad
-- Quest: Finde Flocke, die Katze, und bring sie zu Oma Hilde
-- Büsche mit dem Stock schlagen gibt Erfahrung → Level-Up, mehr Herzen
-- Nach der Quest öffnet sich das Tor zum Flüsterwald (Demo-Ende)
+Theo will den bösen Drachen am Buttenberg besiegen – aber nicht allein.
+Er muss seine besten Freunde Felix und Arne und seinen kleinen Bruder Friedrich überzeugen.
+
+Die Gruppe läuft zusammen, wer vorne läuft, setzt seine Spezialkraft ein:
+
+| Figur | Spezialkraft (B) | Wofür |
+|---|---|---|
+| Theo | Schutzschild | Kastanien (später Drachenfeuer) abwehren |
+| Felix | Superstärke | Felsbrocken schieben, Büsche ausreißen |
+| Arne | Löcher buddeln | Schätze ausgraben, Tunnel unter Zäunen |
+| Friedrich | Unsichtbar | an der Torwache vorbeischleichen |
+
+Quest-Kette: Kastanienprobe (Felix) → Fels vor Arnes Tür → Tunnel in Oma Hildes Garten, Tarnumhang holen
+→ Mama erlaubt Friedrich mitzukommen → unsichtbar zum Torhebel → Tor zum Buttenberg.
 
 ## Steuerung
 
-| Aktion   | Tastatur              | Gamepad          | Touch      |
-|----------|-----------------------|------------------|------------|
-| Laufen   | Pfeiltasten / WASD    | Steuerkreuz / Stick | Steuerkreuz |
-| Reden    | Leertaste / Enter / E | A (unten)        | A          |
-| Schlagen | J / K / X             | B / X            | B          |
+| Aktion   | Tastatur              | Gamepad             | Touch        |
+|----------|-----------------------|---------------------|--------------|
+| Laufen   | Pfeiltasten / WASD    | Steuerkreuz / Stick | Steuerkreuz  |
+| Reden    | Leertaste / Enter / E | A (unten)           | A            |
+| Spezialkraft | J / K / X         | B / X               | B            |
+| Anführer wechseln | Q / Tab      | Y / L / R           | Pfeil-Knopf  |
 
 ## In Perchance einbinden
 
@@ -48,7 +59,7 @@ python -m http.server 8000
 index.html        Seite, Touch-Steuerung, Styles
 src/main.js       Spielschleife, Spieler, Kamera, Rendering, HUD
 src/world.js      Karte, Kollision, Tiles und Objekte (Häuser, Brunnen, Stand)
-src/npcs.js       Bewohner und Dialoge, Quest-Logik
+src/npcs.js       Bewohner, Gefährten, Dialoge und Quest-Schritte
 src/sprites.js    Figuren-Sprites (lauflängenkodierte Pixel-Maps)
 src/dialog.js     Dialogbox mit Schreibmaschinen-Effekt
 src/input.js      Tastatur, Touch, Gamepad

@@ -4,8 +4,15 @@ export const TILE = 16;
 export const MAP_W = 32;
 export const MAP_H = 24;
 
-export const T = { GRASS: 0, FLOWER: 1, PATH: 2, WATER: 3, TREE: 4, FENCE: 5, BUSH: 6, ROCK: 7, GATE: 8 };
-const SOLID = new Set([T.WATER, T.TREE, T.FENCE, T.BUSH, T.ROCK, T.GATE]);
+export const T = {
+  GRASS: 0, FLOWER: 1, PATH: 2, WATER: 3, TREE: 4, FENCE: 5, BUSH: 6, ROCK: 7, GATE: 8,
+  BOULDER: 9,   // Felix kann ihn schieben
+  DIG: 10,      // lockere Erde – Arne kann graben
+  DIGFENCE: 11, // Zaun mit lockerer Erde darunter – Arne gräbt einen Tunnel
+  TUNNEL: 12,   // gegrabener Durchgang unter dem Zaun
+  HOLE: 13,     // ausgegrabenes Loch (begehbar)
+};
+const SOLID = new Set([T.WATER, T.TREE, T.FENCE, T.BUSH, T.ROCK, T.GATE, T.BOULDER, T.DIGFENCE]);
 
 export const COL = {
   out: '#1a1020',
@@ -67,12 +74,13 @@ export function createWorld() {
   rect(6, 14, 2, 2, T.PATH);    // zum Garten
   rect(15, 1, 2, 1, T.GATE);    // Tor zum Flüsterwald
 
-  // Garten mit Zaun (Flocke versteckt sich hier)
+  // Oma Hildes Garten – rundum Zaun, nur unten durch kommt man (Arne gräbt)
   rect(3, 16, 8, 1, T.FENCE); rect(3, 21, 8, 1, T.FENCE);
   rect(3, 16, 1, 6, T.FENCE); rect(10, 16, 1, 6, T.FENCE);
   rect(4, 17, 6, 4, T.GRASS);
-  for (const [x, y] of [[4, 17], [5, 18], [9, 17], [4, 20], [6, 20], [8, 18]]) set(x, y, T.FLOWER);
-  set(6, 16, T.BUSH); set(7, 16, T.BUSH);
+  for (const [x, y] of [[4, 17], [5, 18], [9, 17], [4, 20], [8, 20], [8, 18]]) set(x, y, T.FLOWER);
+  set(7, 16, T.DIGFENCE);
+  say(7, 16, ['Der Zaun ist zu hoch zum Klettern. Aber die Erde darunter ist ganz locker...']);
 
   // Teich
   rect(21, 16, 6, 4, T.WATER);
@@ -83,6 +91,15 @@ export function createWorld() {
   for (const [x, y] of [[12, 17], [13, 18], [17, 18], [18, 20], [28, 5], [28, 6], [19, 4], [20, 4],
     [8, 10], [27, 14], [2, 15], [11, 20]]) set(x, y, T.BUSH);
 
+  // Felsbrocken vor Arnes Tür, Steine links und rechts – nur Felix kommt da durch
+  const under = new Map();
+  set(23, 8, T.ROCK); set(25, 8, T.ROCK);
+  under.set('24,9', T.PATH);
+  set(24, 9, T.BOULDER);
+
+  // Grabstellen mit kleinen Schätzen
+  for (const [x, y] of [[19, 19], [27, 10], [12, 2]]) set(x, y, T.DIG);
+
   // Häuser
   const addHouse = (x, y, w, h, doorDx, roof, lines) => {
     const o = { type: 'house', x, y, w, h, roof, door: { x: x + doorDx, y: y + h - 1 }, sortY: (y + h) * TILE };
@@ -91,9 +108,9 @@ export function createWorld() {
     solidRect(x, y, w, h);
     say(o.door.x, o.door.y, lines);
   };
-  addHouse(3, 4, 5, 4, 2, ROOFS.red, ['Oma Hildes Haus. Die Tür ist zu.']);
-  addHouse(9, 5, 4, 3, 1, ROOFS.blue, ['Hier wohnt Tim mit seinen Eltern. Abgeschlossen.']);
-  addHouse(22, 4, 5, 4, 2, ROOFS.green, ['Lottes Haus. Niemand daheim – sie steht am Marktstand.']);
+  addHouse(3, 4, 5, 4, 2, ROOFS.red, ['Felix\' Haus. Felix ist draußen.']);
+  addHouse(9, 5, 4, 3, 1, ROOFS.blue, ['Theos Zuhause. Hier wohnt er mit Mama und Friedrich.']);
+  addHouse(22, 4, 5, 4, 2, ROOFS.green, ['Arnes Haus.']);
 
   // Brunnen
   {
@@ -119,12 +136,29 @@ export function createWorld() {
     o.draw = (g, cx, cy) => drawSign(g, o, cx, cy);
     objects.push(o);
     solidRect(17, 3, 1, 1);
-    say(17, 3, ['NORDEN: Flüsterwald', 'Zutritt nur mit Erlaubnis der Torwache!']);
+    say(17, 3, ['NORDEN: Der Buttenberg', 'Achtung, Drache! Zutritt nur mit Erlaubnis der Torwache!']);
   }
 
+  // Torhebel
+  const lever = { type: 'lever', x: 18, y: 2, sortY: 3 * TILE, pulled: false };
+  lever.draw = (g, cx, cy) => drawLever(g, lever, cx, cy);
+  objects.push(lever);
+  solidRect(18, 2, 1, 1);
+
   const world = {
-    tiles, block, objects, texts, counter,
+    tiles, block, objects, texts, counter, lever,
     gateOpen: false,
+    isLever(tx, ty) { return tx === 18 && ty === 2; },
+    // Fels schieben: nur auf freies Gras/Blumen, nicht auf Wege (verhindert Sackgassen)
+    pushBoulder(tx, ty, dx, dy, occupied) {
+      const nx = tx + dx, ny = ty + dy;
+      const dest = world.tile(nx, ny);
+      if ((dest !== T.GRASS && dest !== T.FLOWER) || block[ny][nx] || occupied(nx, ny)) return false;
+      under.set(`${nx},${ny}`, dest);
+      tiles[ny][nx] = T.BOULDER;
+      tiles[ty][tx] = under.get(`${tx},${ty}`) ?? T.GRASS;
+      return true;
+    },
     tile(tx, ty) { return inside(tx, ty) ? tiles[ty][tx] : T.TREE; },
     setTile(tx, ty, t) { if (inside(tx, ty)) tiles[ty][tx] = t; },
     isSolidTile(tx, ty) {
@@ -134,7 +168,7 @@ export function createWorld() {
     },
     isCounter(tx, ty) { return counter.has(`${tx},${ty}`); },
     textAt(tx, ty) { return texts.get(`${tx},${ty}`) || null; },
-    openGate() { world.gateOpen = true; rect(15, 1, 2, 1, T.PATH); },
+    openGate() { world.gateOpen = true; lever.pulled = true; rect(15, 1, 2, 1, T.PATH); },
   };
   return world;
 }
@@ -156,8 +190,8 @@ function variant(world, tx, ty, t, frame) {
       const m = (land(tx, ty - 1) ? 1 : 0) | (land(tx + 1, ty) ? 2 : 0) | (land(tx, ty + 1) ? 4 : 0) | (land(tx - 1, ty) ? 8 : 0);
       return m + frame * 16;
     }
-    case T.FENCE: {
-      const f = (x, y) => tl(x, y) === T.FENCE || tl(x, y) === T.BUSH && y === 16;
+    case T.FENCE: case T.DIGFENCE: case T.TUNNEL: {
+      const f = (x, y) => { const n = tl(x, y); return n === T.FENCE || n === T.DIGFENCE || n === T.TUNNEL; };
       return (f(tx, ty - 1) ? 1 : 0) | (f(tx + 1, ty) ? 2 : 0) | (f(tx, ty + 1) ? 4 : 0) | (f(tx - 1, ty) ? 8 : 0);
     }
     default: return 0;
@@ -303,6 +337,47 @@ const PAINT = {
     px(g, COL.woodD, 0, 4, 16, 2); px(g, COL.woodD, 0, 10, 16, 2);
     px(g, '#5a5a6a', 2, 4, 2, 2); px(g, '#5a5a6a', 12, 10, 2, 2);
   },
+
+  [T.BOULDER](g) {
+    paintGrass(g, 3);
+    px(g, 'rgba(0,0,0,0.25)', 1, 13, 14, 3);
+    blob(g, 8, 8, 7.8, 7.4, (d, dx, dy) => {
+      if (d > 0.84) return '#2e2620';
+      if (dx + dy < -0.7) return '#c8b49a';
+      if (dx + dy > 0.5) return '#6e5a48';
+      return '#9c8670';
+    });
+    px(g, '#4e4034', 5, 6, 3, 1); px(g, '#4e4034', 7, 7, 1, 2); px(g, '#4e4034', 10, 10, 2, 1);
+    px(g, '#e0d0b8', 4, 3, 2, 1);
+  },
+
+  [T.DIG](g) {
+    paintGrass(g, 2);
+    blob(g, 8, 9, 6, 4.5, (d) => (d > 0.7 ? '#7a5030' : '#a0703e'));
+    px(g, '#5a3a20', 5, 8, 6, 1); px(g, '#5a3a20', 7, 7, 1, 3); px(g, '#5a3a20', 9, 10, 2, 1);
+    px(g, '#c89060', 6, 7, 1, 1); px(g, '#c89060', 10, 8, 1, 1);
+  },
+
+  [T.HOLE](g) {
+    paintGrass(g, 2);
+    blob(g, 8, 9, 6, 4.5, (d, dx, dy) => (d > 0.72 ? '#a0703e' : dy < 0 ? '#2a1a10' : '#4a2e18'));
+    px(g, '#a0703e', 12, 4, 3, 2); px(g, '#7a5030', 13, 5, 2, 1);
+  },
+
+  [T.DIGFENCE](g, conn) {
+    PAINT[T.FENCE](g, conn);
+    px(g, '#a0703e', 3, 13, 10, 3); px(g, '#7a5030', 4, 14, 3, 1); px(g, '#7a5030', 9, 15, 3, 1);
+    px(g, '#c89060', 6, 13, 1, 1);
+  },
+
+  [T.TUNNEL](g, conn) {
+    paintGrass(g, 1);
+    blob(g, 8, 11, 6.5, 4.5, (d, dx, dy) => (d > 0.75 ? '#a0703e' : dy < 0.2 ? '#1a1008' : '#3a2412'));
+    const rail = (x, w) => { px(g, COL.woodD, x, 3, w, 2); px(g, COL.wood, x, 3, w, 1); };
+    if (conn & 8) rail(0, 5);
+    if (conn & 2) rail(11, 5);
+    px(g, COL.woodD, 1, 1, 3, 5); px(g, COL.woodD, 12, 1, 3, 5);
+  },
 };
 
 // --- Objekte ------------------------------------------------------------------
@@ -426,6 +501,22 @@ function drawStall(g, o, cx, cy) {
     px(g, i % 2 ? '#f4f0e8' : '#d84848', X - 2 + i * 4, Y - 20, 4, 7);
     px(g, i % 2 ? '#f4f0e8' : '#d84848', X - 1 + i * 4, Y - 13, 2, 1);
   }
+}
+
+function drawLever(g, o, cx, cy) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  px(g, 'rgba(0,0,0,0.2)', X + 3, Y + 13, 10, 3);
+  px(g, COL.out, X + 2, Y + 9, 12, 6);
+  px(g, COL.stone, X + 3, Y + 10, 10, 4);
+  px(g, COL.rockL, X + 3, Y + 10, 10, 1);
+  // Hebelarm: links = zu, rechts = offen
+  const tip = o.pulled ? [X + 12, Y + 1] : [X + 3, Y + 1];
+  for (let i = 0; i <= 8; i++) {
+    const t = i / 8;
+    px(g, COL.woodD, Math.round(X + 7 + (tip[0] - X - 7) * t), Math.round(Y + 10 + (tip[1] - Y - 10) * t), 2, 1);
+  }
+  px(g, '#d83838', tip[0] - 1, tip[1] - 1, 3, 3);
+  px(g, '#ff9090', tip[0] - 1, tip[1] - 1, 1, 1);
 }
 
 function drawSign(g, o, cx, cy) {

@@ -29,6 +29,7 @@
     font: 18px "Press Start 2P", monospace; color: #fff; border: 3px solid #0e1220; touch-action: none; }
   #btnA { background: #c8384a; margin-top: -30px; }
   #btnB { background: #3a58c8; margin-top: 30px; }
+  .btn.small { width: 48px; height: 48px; font: 22px system-ui, sans-serif; background: #4a5068; margin-top: 50px; }
   .btn.on { filter: brightness(1.4); }
 </style>
 </head>
@@ -37,7 +38,7 @@
   <canvas id="screen" tabindex="0"></canvas>
   <div id="touch">
     <div id="dpad"><div class="arm h"></div><div class="arm v"></div></div>
-    <div id="btns"><div class="btn" id="btnB">B</div><div class="btn" id="btnA">A</div></div>
+    <div id="btns"><div class="btn small" id="btnS">&#8644;</div><div class="btn" id="btnB">B</div><div class="btn" id="btnA">A</div></div>
   </div>
 </div>
 <script type="module" src="src/main.js"></script>
