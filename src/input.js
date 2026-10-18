@@ -15,19 +15,11 @@ const latched = {}; // kurze Drücke merken, auch wenn sie zwischen zwei Frames 
 let prevA = false, prevB = false, prevS = false;
 let onGesture = () => {};
 
-// Rohdaten für die Ego-Perspektive (Kapitel 2): einzelne Tasten, Maus, Gamepad-Achsen, Touch-Wischen
-export const raw = {
-  keys: new Set(),        // gedrückt gehaltene Tasten (e.code)
-  pressedKeys: new Set(), // in diesem Frame neu gedrückt
-  mouseDX: 0, mouseL: false, mouseLPressed: false, wheel: 0,
-  axes: [0, 0, 0, 0], buttons: [], prevButtons: [],
-  touch: tc, touchTurn: 0,
-};
-
 export const input = {
   dir: { x: 0, y: 0 },
   a: false, b: false,
   aPressed: false, bPressed: false, swapPressed: false,
+  tapY: 0, // kurzer Tipp hoch/runter (für Menüs), auch wenn zwischen zwei Frames losgelassen
   device: 'keyboard',
 };
 
@@ -38,9 +30,6 @@ export function isTouch() {
 export function initInput(gestureCallback) {
   onGesture = gestureCallback || onGesture;
   addEventListener('keydown', (e) => {
-    raw.keys.add(e.code);
-    if (!e.repeat) raw.pressedKeys.add(e.code);
-    if (/^Digit[1-4]$/.test(e.code) || e.code === 'ControlLeft') e.preventDefault();
     const k = KEYMAP[e.code];
     if (!k) return;
     e.preventDefault();
@@ -50,31 +39,10 @@ export function initInput(gestureCallback) {
     onGesture();
   });
   addEventListener('keyup', (e) => {
-    raw.keys.delete(e.code);
     const k = KEYMAP[e.code];
     if (k) { kb[k] = false; e.preventDefault(); }
   });
-  addEventListener('blur', () => { for (const k in kb) kb[k] = false; raw.keys.clear(); raw.mouseL = false; });
-
-  // Maus: Drehen nur mit Pointer Lock, Linksklick = Aktion
-  addEventListener('mousemove', (e) => { if (document.pointerLockElement) raw.mouseDX += e.movementX; });
-  addEventListener('mousedown', (e) => { if (e.button === 0) { raw.mouseL = true; raw.mouseLPressed = true; } });
-  addEventListener('mouseup', (e) => { if (e.button === 0) raw.mouseL = false; });
-  addEventListener('wheel', (e) => { raw.wheel += Math.sign(e.deltaY); }, { passive: true });
-
-  // Touch: Wischen über das Bild dreht die Ansicht
-  const screen = document.getElementById('screen');
-  const lastX = new Map();
-  screen.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') lastX.set(e.pointerId, e.clientX); });
-  screen.addEventListener('pointermove', (e) => {
-    if (!lastX.has(e.pointerId)) return;
-    raw.touchTurn += e.clientX - lastX.get(e.pointerId);
-    lastX.set(e.pointerId, e.clientX);
-  });
-  const endTouch = (e) => lastX.delete(e.pointerId);
-  screen.addEventListener('pointerup', endTouch);
-  screen.addEventListener('pointercancel', endTouch);
-
+  addEventListener('blur', () => { for (const k in kb) kb[k] = false; });
   setupTouch();
 }
 
@@ -124,14 +92,8 @@ function readGamepads() {
   const gp = {};
   let pads = [];
   try { pads = navigator.getGamepads ? navigator.getGamepads() : []; } catch { return gp; } // im iframe evtl. gesperrt
-  raw.axes = [0, 0, 0, 0];
-  raw.buttons = [];
   for (const p of pads) {
     if (!p) continue;
-    if (!raw.buttons.length) {
-      raw.axes = [0, 1, 2, 3].map((i) => { const v = p.axes[i] || 0; return Math.abs(v) < 0.18 ? 0 : v; });
-      raw.buttons = p.buttons.map((bt) => !!(bt && bt.pressed));
-    }
     const b = (i) => !!(p.buttons[i] && p.buttons[i].pressed);
     const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
     if (ay < -0.5 || b(12)) gp.up = true;
@@ -158,18 +120,9 @@ export function pollInput() {
   const swap = held('swap');
   input.swapPressed = (swap && !prevS) || !!latched.swap;
   prevS = swap;
-  latched.a = latched.b = latched.swap = false;
+  input.tapY = latched.up ? -1 : latched.down ? 1 : 0;
+  latched.a = latched.b = latched.swap = latched.up = latched.down = false;
   if (input.aPressed || input.bPressed) onGesture();
   prevA = input.a;
   prevB = input.b;
-}
-
-// Am Ende jedes Frames aufrufen: setzt die Pro-Frame-Werte zurück.
-export function endFrame() {
-  raw.pressedKeys.clear();
-  raw.mouseDX = 0;
-  raw.mouseLPressed = false;
-  raw.wheel = 0;
-  raw.touchTurn = 0;
-  raw.prevButtons = raw.buttons.slice();
 }

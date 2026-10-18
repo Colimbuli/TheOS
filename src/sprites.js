@@ -72,6 +72,8 @@ export const PALETTES = {
   mama:      { o: OUT, s: SKIN, e: EYE, h: '#4a2a1a', c: '#3aa8a0', C: '#2a7a74', k: '#e8d070', p: '#2a7a74' },
   merchant:  { o: OUT, s: SKIN, e: EYE, h: '#d86a2a', c: '#e0b030', C: '#b08020', k: '#7a4a20', p: '#5a4a3a' },
   guard:     { o: OUT, s: '#e8b890', e: EYE, h: '#a0a8b8', c: '#b03a3a', C: '#802a2a', k: '#3a3a3a', p: '#4a4a5a' },
+  teacher:   { o: OUT, s: SKIN, e: EYE, h: '#8a8a94', c: '#4a9a5a', C: '#2e6a3c', k: '#e8e0c0', p: '#2e6a3c' },
+  bruno:     { o: OUT, s: '#e8b890', e: EYE, h: '#3a2414', c: '#e8e0d0', C: '#b8a890', k: '#6a3a1a', p: '#4a3a2a' },
 };
 
 // Körperbau je Figur: Friedrich klein, Felix groß, Arne mit Locken und Sakko
@@ -119,23 +121,6 @@ export function charSprite(palName, dir, frame) {
   return c;
 }
 
-// --- Gegenstände --------------------------------------------------------------
-
-const ITEMS = {
-  cloak: {
-    rows: ['3.4o3.', '2.o4mo2.', '.o3mM2mo.', '.o2mM3mo.', 'o3mM4mo', 'o2mM5mo', 'o8mo', '.8o.'],
-    w: 10, pal: { o: '#1a1020', m: '#7a4ac8', M: '#b090f0' },
-  },
-  chestnut: { rows: ['.2o.', 'obbo', 'obBo', '.2o.'], w: 4, pal: { o: '#2a1408', b: '#8a4a1a', B: '#c88040' } },
-};
-
-export function itemSprite(name) {
-  const key = `item:${name}`;
-  let c = cache.get(key);
-  if (!c) { const it = ITEMS[name]; c = render(rows(it.rows, it.w), it.pal, false); cache.set(key, c); }
-  return c;
-}
-
 // --- Herzen (7x6) -------------------------------------------------------------
 
 const HEART = ['.2o.2o.', 'owro2ro', 'o5ro', '.o3ro.', '2.oro2.', '3.o3.'];
@@ -149,4 +134,108 @@ export function heartSprite(full) {
     cache.set(key, c);
   }
   return c;
+}
+
+// --- Prozedurale Sprites: Gegner, Troll, Gegenstände -------------------------------
+
+function canvasSprite(key, w, h, paint) {
+  let c = cache.get(key);
+  if (c) return c;
+  c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  const px = (col, x, y, ww = 1, hh = 1) => { g.fillStyle = col; g.fillRect(x, y, ww, hh); };
+  const ell = (cx, cy, rx, ry, fn) => {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry, d = dx * dx + dy * dy;
+      if (d <= 1) { const col = typeof fn === 'function' ? fn(dx, dy, d) : fn; if (col) px(col, x, y); }
+    }
+  };
+  paint(px, ell);
+  cache.set(key, c);
+  return c;
+}
+
+export function slimeSprite(frame) {
+  return canvasSprite(`slime${frame}`, 16, 16, (px, ell) => {
+    const sq = frame ? 1 : 0;
+    ell(8, 11 + sq * 0.5, 7 + sq, 5 - sq, (dx, dy, d) => d > 0.8 ? '#14501e' : (dx < -0.2 && dy < -0.3) ? '#9af0a0' : dy > 0.4 ? '#2a8a3a' : '#46c05a');
+    px('#ffffff', 5, 9 + sq, 2, 2); px('#ffffff', 9, 9 + sq, 2, 2);
+    px('#1a1a1a', 6, 10 + sq); px('#1a1a1a', 10, 10 + sq);
+    px('#14501e', 7, 13, 2, 1);
+  });
+}
+
+export function koboldSprite(flip, frame) {
+  return canvasSprite(`kobold${flip}${frame}`, 16, 16, (px, ell) => {
+    const f = (x) => (flip ? 15 - x : x);
+    const P = (c, x, y, w = 1, h = 1) => { for (let i = 0; i < w; i++) px(c, f(x + i), y, 1, h); };
+    P('#3a2a1a', 5, 13, 2, 3); P('#3a2a1a', 9, 13, 2, 3);
+    if (frame) { P('#3a2a1a', 5, 14, 2, 2); P('#3a2a1a', 10, 12, 2, 3); }
+    P('#1a1020', 4, 8, 8, 6); P('#8a5a32', 5, 9, 6, 4); P('#a8784a', 5, 9, 2, 4);
+    P('#1a1020', 3, 2, 10, 7); P('#8ab04a', 4, 3, 8, 5); P('#b0d070', 4, 3, 3, 2);
+    P('#8ab04a', 1, 4, 2, 2); P('#8ab04a', 13, 4, 2, 2);
+    P('#fff060', 5, 5, 2, 1); P('#fff060', 9, 5, 2, 1); P('#1a1a1a', 6, 5); P('#1a1a1a', 10, 5);
+    P('#3a4a1a', 6, 7, 4, 1);
+    P('#d83838', 4, 1, 8, 2); P('#d83838', 6, 0, 4, 1); P('#ffffff', 10, 0, 1, 1);
+    P('#7a9a3a', 12, 9, 2, 2);
+  });
+}
+
+export function trollSprite(frame) {
+  return canvasSprite(`troll${frame}`, 24, 26, (px, ell) => {
+    px('rgba(0,0,0,0.3)', 3, 23, 18, 3);
+    px('#3a4250', 5, 18, 5, 7); px('#3a4250', 14, 18, 5, 7);
+    ell(12, 15, 11, 8, (dx, dy, d) => d > 0.85 ? '#2a3240' : dx < -0.4 ? '#9aaac0' : dy > 0.4 ? '#5a6a80' : '#7a8aa0');
+    px('#6a4a2a', 4, 18, 16, 3); px('#e0c060', 11, 18, 2, 3);
+    ell(12, 7, 7, 6, (dx, dy, d) => d > 0.82 ? '#2a3240' : (dx < -0.3 && dy < 0) ? '#aabace' : '#8090a8');
+    px('#3a3020', 9, 1, 6, 2);
+    const eye = frame ? '#ff5a3a' : '#ffffff';
+    px(eye, 8, 6, 3, 2); px(eye, 13, 6, 3, 2); px('#1a1a1a', 9, 7); px('#1a1a1a', 14, 7);
+    px('#3a3a4a', 9, 10, 6, 1); px('#f0f0e0', 9, 9, 1, 2); px('#f0f0e0', 14, 9, 1, 2);
+    px('#7a8aa0', 0, 12, 3, 9); px('#7a8aa0', 21, 12, 3, 9);
+  });
+}
+
+const ITEM_PAINT = {
+  crystal: (px) => {
+    px('rgba(0,0,0,0.25)', 2, 11, 8, 2);
+    for (let y = 0; y < 11; y++) {
+      const w = y < 4 ? y + 1 : Math.max(1, Math.round((11 - y) * 0.6));
+      for (let x = -w; x <= w; x++) px(x < 0 ? (y < 4 ? '#c8ffff' : '#58d8f0') : (y < 4 ? '#88f0ff' : '#2a9ac8'), 6 + x, y);
+    }
+    px('#ffffff', 5, 2); px('#ffffff', 4, 3);
+  },
+  apple: (px, ell) => {
+    ell(6, 7, 5, 4.5, (dx, dy) => (dx < -0.3 && dy < -0.2 ? '#ff9a9a' : dy > 0.5 ? '#9a1818' : '#d82a2a'));
+    px('#5a3a1a', 6, 1, 1, 3); px('#3aa040', 7, 1, 3, 2);
+  },
+  bag: (px, ell) => {
+    ell(6, 8, 5, 4, (dx) => (dx < -0.3 ? '#c8a070' : '#9a7448'));
+    px('#5a3a1a', 3, 4, 6, 1);
+    for (const x of [3, 6, 9]) { px('#7a3a12', x - 1, 1, 2, 2); }
+  },
+  key: (px, ell) => {
+    ell(3.5, 6, 3, 3, '#f0c838'); px('#3a2a10', 3, 5, 1, 2);
+    px('#f0c838', 6, 5, 6, 2); px('#fff0a0', 6, 5, 6, 1);
+    px('#f0c838', 9, 7, 1, 2); px('#f0c838', 11, 7, 1, 2);
+  },
+  cloak: (px) => {
+    const rows = ['...oooo...', '..ommmmo..', '.ommmMmmo.', '.ommMmmmo.', 'ommmMmmmmo', 'ommMmmmmmo', 'ommmmmmmmo', '.oooooooo.'];
+    const pal = { o: '#1a1020', m: '#7a4ac8', M: '#b090f0' };
+    rows.forEach((r, y) => [...r].forEach((ch, x) => { if (pal[ch]) px(pal[ch], x + 1, y + 2); }));
+  },
+  chestnut: (px) => { px('#2a1408', 0, 0, 4, 4); px('#8a4a1a', 1, 0, 2, 4); px('#8a4a1a', 0, 1, 4, 2); px('#c88040', 1, 1, 1, 1); },
+};
+
+export function itemSprite(type) {
+  const size = type === 'chestnut' ? 4 : 12;
+  return canvasSprite(`it:${type}`, size, size, ITEM_PAINT[type]);
+}
+
+export function fireSprite(frame, reflected) {
+  return canvasSprite(`fire${frame}${reflected}`, 8, 8, (px, ell) => {
+    const [a, b, c] = reflected ? ['#ffffff', '#a8e8ff', '#3a8af0'] : ['#fff6b0', '#ffb040', '#e85020'];
+    ell(4, 4, 4 - frame * 0.5, 4 - frame * 0.5, (dx, dy, d) => (d < 0.25 ? a : d < 0.6 ? b : c));
+  });
 }

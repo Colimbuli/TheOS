@@ -3,7 +3,9 @@
 // game.step:
 //   0 Felix finden            1 Kastanienprobe läuft     2 Felix dabei – Arne abholen
 //   3 Arne dabei – Mama fragen 4 Tarnumhang suchen        5 Umhang gefunden – zu Mama
-//   6 Friedrich dabei – zum Torhebel schleichen            7 Tor offen – ab nach Norden
+//   6 Friedrich dabei – zum Torhebel schleichen            7 Tor offen – ab nach Norden (Höhle)
+//
+// Alle vier Spezialfähigkeiten müssen im Laden gekauft werden (Diamanten gibt's in der Schule).
 
 const T = 16;
 
@@ -24,7 +26,7 @@ export function createNPCs() {
   ].map((n) => ({ anim: 0, moving: false, ...n }));
 }
 
-export const STEP_HINT = [
+const STEP_HINT = [
   'Quest: Überzeuge Felix',
   'Quest: Halte 5 Kastanien auf',
   'Quest: Hol Arne ab',
@@ -32,20 +34,48 @@ export const STEP_HINT = [
   'Quest: Hol den Tarnumhang',
   'Quest: Bring Mama den Umhang',
   'Quest: Unsichtbar zum Torhebel',
-  'Ziel: Zum Buttenberg (Norden)',
+  'Ziel: Die Höhle im Buttenberg (Norden)',
 ];
+// Welche gekaufte Fähigkeit braucht der aktuelle Schritt?
+const STEP_NEEDS = { 0: 'shield', 1: 'shield', 2: 'strength', 4: 'dig', 6: 'invis' };
+export const ABILITY_NAME = { shield: 'Theos Schutzschild', strength: 'Felix\' Superstärke', dig: 'Arnes Grabkraft', invis: 'Friedrichs Tarnzauber' };
+
+export function questHint(game) {
+  if (game.mapId === 'cave' || game.step >= 7 && game.mapId !== 'village') return caveHint(game);
+  const need = STEP_NEEDS[game.step];
+  if (need && !game.owned[need]) return `Quest: Kauf ${ABILITY_NAME[need]}`;
+  return STEP_HINT[game.step];
+}
+
+function caveHint(game) {
+  const c = game.cave, o = game.owned;
+  const need = (id, text) => (o[id] ? text : `Quest: Kauf ${ABILITY_NAME[id]}`);
+  if (!c.dug) return need('dig', 'Quest: Grabt euch durch (Arne)');
+  if (!c.boulder) return need('strength', 'Quest: Schiebt den Felsblock (Felix)');
+  if (!c.key) return 'Quest: Findet den Schlüssel';
+  if (!c.door) return 'Quest: Öffnet die Schlosstür';
+  if (!c.statue) return 'Quest: Besiegt die Statue (Theo)';
+  if (!c.troll) return need('invis', 'Quest: Vorbei am Troll (Friedrich)');
+  if (!c.lever) return 'Quest: Legt den Hebel um';
+  return 'Ziel: Die Treppe in die Tiefe';
+}
 
 // Liefert { lines, after } – after() läuft, wenn der Dialog geschlossen wird.
 export function talkTo(n, game, fx) {
   const s = game.step;
   switch (n.id) {
     case 'felix':
+      if (s === 0 && !game.owned.shield) return { lines: [
+        'Theo: Felix! Kommst du mit zum Buttenberg? Wir besiegen den bösen Drachen!',
+        'Felix: Den Drachen?! Da brauchst du Mut – und einen Schild! Du hast ja nicht mal einen.',
+        'Felix: Bruno im Laden verkauft welche. Für Diamanten. Die gibt\'s in der Schule fürs Lernen.',
+      ] };
       if (s === 0) return {
         lines: [
           'Theo: Felix! Kommst du mit zum Buttenberg? Wir besiegen den bösen Drachen!',
           'Felix: Den Drachen?! Hm... nur wenn du wirklich mutig bist.',
           'Felix: Ich werfe Kastanien nach dir. Halte 5 Stück mit deinem Schutzschild auf!',
-          'Drück B, um den Schild zu bauen – genau dann, wenn eine Kastanie kommt!',
+          'Wähle Theo als Anführer und drück B, um den Schild hochzuhalten – genau dann, wenn eine Kastanie kommt!',
         ],
         after() { game.step = 1; fx.startChallenge(); },
       };
@@ -59,7 +89,7 @@ export function talkTo(n, game, fx) {
       if (s < 3) return { lines: [
         'Mama: Theo! Was hast du denn heute vor?',
         'Theo: Ein Abenteuer! Aber zuerst brauche ich meine Freunde.',
-        'Mama: Na dann. Zum Abendessen bist du zurück!',
+        'Mama: Na dann. Und vergiss die Schule nicht – Frau Klug hat heute Extra-Aufgaben!',
       ] };
       if (s === 3 && !game.hasCloak) return {
         lines: [
@@ -94,6 +124,10 @@ export function talkTo(n, game, fx) {
       return { lines: ['Friedrich: Frag Mama! Ich hab schon meine Schuhe an!'] };
 
     case 'lotte': {
+      if (!game.owned.shield) return { lines: [
+        'Lotte: Diamanten? Die verdienst du bei Frau Klug in der Schule – im Süden, das Haus mit dem Buch.',
+        'Lotte: Und gleich daneben ist Brunos Laden. Da gibt es Schilde, Zaubertränke und noch viel mehr!',
+      ] };
       const tips = [
         'Lotte: Felix? Der übt gerade Kastanien-Weitwurf vor seinem Haus.',
         'Lotte: Felix? Der übt gerade Kastanien-Weitwurf vor seinem Haus.',
@@ -102,10 +136,23 @@ export function talkTo(n, game, fx) {
         'Lotte: Oma Hildes Garten? Die Erde unter dem Zaun ist ganz locker...',
         'Lotte: Ein Tarnumhang? Na, dann schnell zu deiner Mama!',
         'Lotte: Konrad lässt niemanden durch. Aber wen er nicht sieht, den hält er auch nicht auf...',
-        'Lotte: Viel Glück gegen den Drachen! Ich halte euch frische Äpfel bereit.',
+        'Lotte: Viel Glück im Buttenberg! Brunos Schleuder soll gegen Schleime super helfen.',
       ];
       return { lines: [tips[s]] };
     }
+
+    case 'teacher':
+      return { lines: game.quizIntro ? ['Frau Klug: Schön, dass du wieder da bist! Welches Fach?'] : [
+        'Frau Klug: Hallo Theo! Du willst Diamanten verdienen? Dann zeig mal, was du kannst.',
+        'Frau Klug: Für jede richtige Antwort gibt es einen Diamanten. Fünf richtige in Folge geben 2 extra!',
+      ], after() { game.quizIntro = true; fx.openQuiz(); } };
+
+    case 'bruno':
+      return { lines: ['Händler Bruno: Willkommen in Brunos Wunderladen! Was darf\'s sein?'], after() { fx.openShop(); } };
+
+    case 'troll':
+      if (game.cave.troll) return { lines: ['Troll: Hä? Wo kommt ihr denn her?!'] };
+      return { lines: ['Troll: GRRR! Hier kommt keiner durch, den ich sehe!'] };
 
     case 'konrad':
       if (game.world.gateOpen) return { lines: ['Wache Konrad: Vier kleine Helden... Passt bloß auf euch auf am Buttenberg!'] };
