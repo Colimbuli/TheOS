@@ -4,6 +4,8 @@
 //
 // Neue Fragen ergänzen: einfach eine Zeile { q, a, w: [3 falsche Antworten] } in den Pool schreiben.
 
+import { englishRiddle, division, binaryRead, binaryWrite, BOOK_VOCAB, HALLOWEEN_VOCAB } from './halloween.js';
+
 export const SUBJECTS = [
   { id: 'de', name: 'Deutsch' },
   { id: 'en', name: 'Englisch' },
@@ -235,9 +237,19 @@ const recent = { de: [], en: [], geo: [], ma: [] };
 function raw(subject) {
   switch (subject) {
     case 'de': return pick(DE);
-    case 'en': return Math.random() < 0.55 ? vocabQuestion() : pick(EN);
+    case 'en': {
+      // Hälfte: Lehrbuch "Here we go" + Halloween, Rest: Grundwortschatz und Grammatik
+      const r = Math.random();
+      if (r < 0.5) return englishRiddle();
+      return r < 0.75 ? vocabQuestion() : pick(EN);
+    }
     case 'geo': return Math.random() < 0.35 ? capitalQuestion() : pick(GEO);
-    case 'ma': return mathQuestion();
+    case 'ma': {
+      const r = Math.random();
+      if (r < 0.25) return division();
+      if (r < 0.4) return Math.random() < 0.5 ? binaryRead() : binaryWrite();
+      return mathQuestion();
+    }
   }
   return pick(DE);
 }
@@ -255,4 +267,4 @@ export function nextQuestion(subject) {
   return { q: item.q, options, correct: options.indexOf(item.a) };
 }
 
-export const POOL_SIZES = { de: DE.length, en: EN.length + VOCAB.length, geo: GEO.length + LAENDER.length + EUROPA.length };
+export const POOL_SIZES = { de: DE.length, en: EN.length + VOCAB.length + BOOK_VOCAB.length + HALLOWEEN_VOCAB.length, geo: GEO.length + LAENDER.length + EUROPA.length };

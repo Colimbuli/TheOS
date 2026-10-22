@@ -41,10 +41,24 @@ const STEP_NEEDS = { 0: 'shield', 1: 'shield', 2: 'strength', 4: 'dig', 6: 'invi
 export const ABILITY_NAME = { shield: 'Theos Schutzschild', strength: 'Felix\' Superstärke', dig: 'Arnes Grabkraft', invis: 'Friedrichs Tarnzauber' };
 
 export function questHint(game) {
+  if (game.mapId === 'haunted') return hauntHint(game);
   if (game.mapId === 'cave' || game.step >= 7 && game.mapId !== 'village') return caveHint(game);
   const need = STEP_NEEDS[game.step];
   if (need && !game.owned[need]) return `Quest: Kauf ${ABILITY_NAME[need]}`;
   return STEP_HINT[game.step];
+}
+
+function hauntHint(game) {
+  const h = game.haunt;
+  if (!h.gate) return 'Quest: Rechenrätsel der Hexe';
+  if (!h.front) return 'Quest: Gespenst Bodo an der Haustür';
+  if (!h.count) return 'Quest: Zähl-Rätsel in der Halle';
+  if (!h.chest) return game.owned.strength ? 'Quest: Schiebt die Truhe (Felix)' : `Quest: Kauf ${ABILITY_NAME.strength}`;
+  if (!h.lib) return 'Quest: Englisch bei Prof. Plumps';
+  if (!h.candles) return `Quest: Zeig die ${h.target} mit den Kerzen`;
+  if (!h.king) return 'Quest: Rätsel von Graf Kürbis';
+  if (!h.door6) return 'Quest: Öffnet die Turmtür';
+  return 'Ziel: Treppe zur Drachenhöhle';
 }
 
 function caveHint(game) {
@@ -149,6 +163,54 @@ export function talkTo(n, game, fx) {
 
     case 'bruno':
       return { lines: ['Händler Bruno: Willkommen in Brunos Wunderladen! Was darf\'s sein?'], after() { fx.openShop(); } };
+
+    // --- Kapitel 3: Spukhaus ---
+    case 'witch':
+      if (game.haunt.gate) return { lines: ['Hexe Kunigunde: Hihihi! Das Tor ist offen. Und rechnen kannst du auch!'] };
+      return { lines: [
+        'Hexe Kunigunde: Hihihi! Wer ins Spukhaus will, muss erst an meinem Tor vorbei.',
+        'Hexe Kunigunde: Ich verteile gern Süßes – aber gerecht! Löse zwei Teil-Aufgaben, dann geht das Tor auf.',
+        'Tipp: Rechne schriftlich auf einem Zettel mit!',
+      ], after() { fx.openRiddle('gate'); } };
+
+    case 'bodo':
+      if (game.haunt.front) return { lines: ['Gespenst Bodo: Boooohh! Ach, ihr seid es. Viel Spaß im Haus!'] };
+      return { lines: [
+        'Gespenst Bodo: Boooohh! Trick or treat? Hier kommt nur rein, wer Englisch kann!',
+        'Gespenst Bodo: Answer two questions about Halloween!',
+      ], after() { fx.openRiddle('front'); } };
+
+    case 'zora':
+      if (game.haunt.count) return { lines: ['Gespenst Zora: Gut gezählt! Ich zähle jetzt Schafe ... huaaah.'] };
+      return { lines: [
+        'Gespenst Zora: Ich bin Zora, das Zählgespenst. Hast du dir die Halle genau angesehen?',
+        'Gespenst Zora: Kürbisse, Kerzen, Fledermäuse, Spinnen ... Zähl gut nach, bevor du antwortest!',
+      ], after() { fx.openRiddle('count'); } };
+
+    case 'plumps':
+      if (game.haunt.lib) return { lines: ['Professor Plumps: Very good! Ihr kennt euer Englischbuch.'] };
+      return { lines: [
+        'Professor Plumps: Ah, Besuch in meiner Bibliothek! Ich bin Professor Plumps.',
+        'Professor Plumps: Die Tür zum Kerzenraum öffnet sich nur für Kinder, die ihr Englischbuch kennen. Three questions!',
+      ], after() { fx.openRiddle('lib'); } };
+
+    case 'bit':
+      if (game.haunt.candles) return { lines: ['Bit: Super! Ihr könnt Binärcode. Willst du nochmal üben?'], after() { fx.openRiddle('bit'); } };
+      return { lines: [
+        'Bit: Hallo! Ich bin Bit, das Computer-Gespenst. Computer zählen nur mit 0 und 1.',
+        'Bit: Jede Kerze hat einen Wert: 16, 8, 4, 2, 1. Brennt sie, zählt der Wert (= 1). Ist sie aus, zählt er nicht (= 0).',
+        'Bit: Beispiel: 13 = 8 + 4 + 1. Also Kerzen: aus, an, an, aus, an. Binär: 01101.',
+        `Bit: Auf der Tür steht ${game.haunt.target}. Zünde die richtigen Kerzen an – drück A vor einer Kerze!`,
+        'Bit: Willst du vorher üben? Drei Übungsfragen bringen Diamanten.',
+      ], after() { fx.openRiddle('bit'); } };
+
+    case 'graf':
+      if (game.haunt.king) return { lines: ['Graf Kürbis: Der Mondschlüssel öffnet die Turmtür. Viel Glück beim Drachen!'] };
+      return { lines: [
+        'Graf Kürbis: Wer wagt es, meinen Thronsaal zu betreten?!',
+        'Theo: Wir wollen zum Drachen. Bitte lass uns durch!',
+        'Graf Kürbis: Hohoho! Nur mit meinem Mondschlüssel. Den bekommt, wer meine drei Rätsel löst!',
+      ], after() { fx.openRiddle('king'); } };
 
     case 'troll':
       if (game.cave.troll) return { lines: ['Troll: Hä? Wo kommt ihr denn her?!'] };

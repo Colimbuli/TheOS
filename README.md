@@ -30,6 +30,19 @@ Feuer-Kobolden → Drachenstatue (Theo wirft ihr Feuer zurück) → Höhlentroll
 → Hebel → Treppe in die Tiefe. Dazu ein Geheimraum mit Kristallen. Kein Game Over – wer erschöpft ist,
 startet am letzten Rastplatz.
 
+**3 – Das Spukhaus am Buttenberg (Halloween-Nacht):** Jede Tür öffnet sich nur mit gelösten Rätseln:
+
+| Tür | Wächter | Rätsel |
+|---|---|---|
+| Gartentor | Hexe Kunigunde | Schriftliche Division als Textaufgabe (2 richtig) |
+| Haustür | Gespenst Bodo | Halloween-Englisch: Who am I?, Vokabeln, Lesetext, Satzbau (2 richtig) |
+| Halle → Bibliothek | Gespenst Zora | Zählen in der Halle: True/False, How many …? (2 richtig) |
+| Bibliothek → Kerzenraum | Prof. Plumps | Lehrbuch-Englisch „Here we go“ (3 richtig) – vorher Truhe wegschieben (Felix) |
+| Kerzenraum → Thronsaal | Bit | Binärcode: fünf Kerzen (16 8 4 2 1) so anzünden, dass die Zahl an der Tür entsteht |
+| Turmtür | Graf Kürbis | Gemischt: Division, Binärcode, Englisch (3 richtig) → Mondschlüssel |
+
+Falsche Antworten kosten nichts – es kommt einfach eine neue Frage (die Lösung wird nicht verraten).
+
 Der Spielstand wird automatisch im Browser gespeichert („Weiterspielen“ im Titelbild).
 
 ## Steuerung
@@ -49,7 +62,13 @@ Alles in `src/quiz.js`:
 - **Deutsch / Englisch / Geographie:** eine Zeile `{ q: 'Frage', a: 'richtig', w: ['falsch', 'falsch', 'falsch'] }`
   in den passenden Pool (`DE`, `EN`, `GEO`) schreiben. Vokabeln in `VOCAB`, Hauptstädte in `LAENDER` / `EUROPA`.
 - **Mathe** wird zufällig erzeugt (`MATH`-Liste): Rechnen, Punkt vor Strich, Klammern, ganze Zahlen, Runden,
-  Größen umrechnen, Rechteck, Teiler.
+  Größen umrechnen, Rechteck, Teiler – dazu schriftliche Division und Binärzahlen.
+
+In `src/halloween.js` (Spukhaus und Schule):
+- `BOOK_VOCAB` – Vokabeln aus dem Lehrbuch („Here we go“, S. 174/175), `BOOK_GRAMMAR` – Sätze/Grammatik dazu
+- `HALLOWEEN_VOCAB`, `WHO` („Who am I?“), `SENTENCES` (Wörter ordnen), `READING` (Lesetext)
+- `division()` – teilt ohne Rest, oft mit Null im Ergebnis (typischer Fehler als falsche Antwort)
+- `binaryRead()` / `binaryWrite()` – 5 Stellen (16 8 4 2 1)
 
 Preise und Angebot des Ladens stehen in `src/shop.js`.
 
@@ -81,12 +100,13 @@ python -m http.server 8000
 ```
 index.html        Seite, Touch-Steuerung, Styles
 src/main.js       Spielschleife, Gruppe, Fähigkeiten, Kampf, Kartenwechsel, HUD
-src/maps.js       Karten: Dorf, Schule, Laden, Höhle (Layout, Gegner, Gegenstände, Hinweise)
+src/maps.js       Karten: Dorf, Schule, Laden, Höhle, Spukhaus (Layout, Gegner, Gegenstände, Hinweise)
 src/world.js      Tile-System, Kollision, Tile- und Objektgrafik
 src/npcs.js       Figuren, Dialoge, Quest-Schritte und Hinweise
-src/quiz.js       Lernaufgaben (Fragenpools + Mathe-Generator)
+src/quiz.js       Lernaufgaben der Schule (Fragenpools + Mathe-Generator)
+src/halloween.js  Halloween-, Lehrbuch-, Binär- und Divisionsaufgaben
 src/shop.js       Ladenangebot und Kauf
-src/ui.js         Menüs für Schule und Laden
+src/ui.js         Menüs für Schule, Laden und Rätseltüren
 src/save.js       Spielstand (localStorage)
 src/sprites.js    Figuren-, Gegner- und Gegenstands-Sprites
 src/dialog.js     Dialogbox mit Schreibmaschinen-Effekt

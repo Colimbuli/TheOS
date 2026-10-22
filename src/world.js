@@ -20,10 +20,13 @@ export const T = {
   MUSH: 21,     // Leuchtpilze (begehbar)
   // Innenräume
   WOOD: 22, IWALL: 23, EXIT: 24, RUG: 25,
+  // Spukhaus
+  RDOOR: 26,    // Rätseltür im Haus
+  RGATE: 27,    // Rätsel-Gartentor
 };
 const SOLID = new Set([T.WATER, T.TREE, T.FENCE, T.BUSH, T.ROCK, T.GATE, T.BOULDER, T.DIGFENCE,
-  T.CWALL, T.EWALL, T.LOCKED, T.BARS, T.IWALL]);
-const FLOORISH = new Set([T.GRASS, T.FLOWER, T.CFLOOR, T.MUSH]); // hierauf darf ein Fels geschoben werden
+  T.CWALL, T.EWALL, T.LOCKED, T.BARS, T.IWALL, T.RDOOR, T.RGATE]);
+const FLOORISH = new Set([T.GRASS, T.FLOWER, T.CFLOOR, T.MUSH, T.WOOD]); // hierauf darf ein Fels geschoben werden
 
 // Generischer Kartenbaukasten. Liefert das Kartenobjekt mit Bau-Helfern (b.*).
 export function makeMap({ id, w, h, fill, edge, theme }) {
@@ -131,7 +134,7 @@ function variant(world, tx, ty, t, frame) {
       const r = (x, y) => tl(x, y) === T.RUG;
       return (r(tx, ty - 1) ? 0 : 1) | (r(tx + 1, ty) ? 0 : 2) | (r(tx, ty + 1) ? 0 : 4) | (r(tx - 1, ty) ? 0 : 8);
     }
-    case T.BOULDER: return world.theme === 'cave' ? 1 : 0;
+    case T.BOULDER: return world.theme === 'cave' ? 1 : world.theme === 'haunted' ? 2 : 0;
     case T.UP: case T.DOWN: return frame;
     default: return 0;
   }
@@ -278,6 +281,7 @@ const PAINT = {
   },
 
   [T.BOULDER](g, v) {
+    if (v === 2) { paintChest(g); return; }
     if (v) PAINT[T.CFLOOR](g, 1); else paintGrass(g, 3);
     px(g, 'rgba(0,0,0,0.25)', 1, 13, 14, 3);
     blob(g, 8, 8, 7.8, 7.4, (d, dx, dy) => {
@@ -415,6 +419,29 @@ const PAINT = {
     for (let x = 4; x < 13; x += 2) px(g, '#e8a040', x, 8, 1, 5);
   },
 
+  [T.RDOOR](g) {
+    PAINT[T.IWALL](g, 1);
+    px(g, '#1a0e08', 2, 1, 12, 15);
+    px(g, '#5a2e5a', 3, 2, 10, 14);
+    px(g, '#7a4a7a', 3, 2, 10, 2);
+    px(g, '#3a1a3a', 7, 4, 1, 12);
+    // Fragezeichen-Plakette
+    px(g, '#f0c838', 5, 5, 6, 7); px(g, '#8a6a10', 5, 11, 6, 1);
+    px(g, '#2a1408', 6, 6, 4, 1); px(g, '#2a1408', 9, 7, 1, 1); px(g, '#2a1408', 7, 8, 2, 1); px(g, '#2a1408', 7, 10, 2, 1);
+  },
+
+  [T.RGATE](g) {
+    paintGrass(g, 0);
+    px(g, 'rgba(0,0,0,0.25)', 0, 13, 16, 3);
+    for (let x = 1; x < 16; x += 3) {
+      px(g, '#2a2a34', x, 2, 2, 13);
+      px(g, '#6a6a7a', x, 2, 1, 13);
+      px(g, '#8a8a9a', x, 0, 1, 2);
+    }
+    px(g, '#2a2a34', 0, 5, 16, 2); px(g, '#2a2a34', 0, 11, 16, 2);
+    px(g, '#f0c838', 6, 6, 4, 5); px(g, '#2a1408', 7, 7, 2, 1); px(g, '#2a1408', 8, 8, 1, 1); px(g, '#2a1408', 7, 9, 1, 1);
+  },
+
   [T.RUG](g, m) {
     PAINT[T.WOOD](g);
     px(g, '#a83838', 0, 0, 16, 16);
@@ -426,6 +453,18 @@ const PAINT = {
     if (m & 8) { px(g, '#b8834a', 0, 0, 2, 16); px(g, e, 2, 0, 1, 16); }
   },
 };
+
+// Schwere Truhe (im Spukhaus statt Felsbrocken)
+function paintChest(g) {
+  PAINT[T.WOOD](g);
+  px(g, 'rgba(0,0,0,0.3)', 1, 13, 14, 3);
+  px(g, '#2a1408', 1, 2, 14, 13);
+  px(g, '#7a4422', 2, 3, 12, 11);
+  px(g, '#9a5a2e', 2, 3, 12, 4);
+  px(g, '#c8803e', 2, 3, 12, 1);
+  px(g, '#3a3a44', 2, 7, 12, 1); px(g, '#3a3a44', 4, 3, 1, 11); px(g, '#3a3a44', 11, 3, 1, 11);
+  px(g, '#f0c838', 7, 6, 2, 3); px(g, '#2a1408', 7, 7, 2, 1);
+}
 
 const CAVE = {
   floor: '#6e6258', floorD: '#564a42', floorL: '#8a7e72',
@@ -742,4 +781,91 @@ export function drawWindow(g, o, cx, cy) {
   px(g, '#9ad0f8', X + 3, Y + 2, 10, 7);
   px(g, '#d8f0ff', X + 4, Y + 3, 3, 2);
   px(g, '#5a3a20', X + 7, Y + 2, 1, 7); px(g, '#5a3a20', X + 3, Y + 5, 10, 1);
+}
+
+// --- Spukhaus-Objekte --------------------------------------------------------------
+
+export function drawPumpkin(g, o, cx, cy, t) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  px(g, 'rgba(0,0,0,0.3)', X + 2, Y + 13, 12, 3);
+  px(g, '#3a1a08', X + 1, Y + 4, 14, 11);
+  px(g, '#e07a20', X + 2, Y + 5, 12, 9);
+  px(g, '#f8a040', X + 3, Y + 5, 3, 7); px(g, '#c05a10', X + 7, Y + 5, 1, 9); px(g, '#c05a10', X + 10, Y + 5, 1, 9);
+  px(g, '#3a6a20', X + 7, Y + 1, 2, 4); px(g, '#5a9a30', X + 9, Y + 2, 3, 2);
+  if (o.lit) {
+    const f = Math.floor(t * 6 + o.x) % 2 ? '#fff060' : '#ffc030';
+    px(g, '#2a1008', X + 4, Y + 7, 3, 2); px(g, f, X + 5, Y + 7, 1, 1);
+    px(g, '#2a1008', X + 9, Y + 7, 3, 2); px(g, f, X + 10, Y + 7, 1, 1);
+    px(g, '#2a1008', X + 4, Y + 10, 8, 2); px(g, f, X + 5, Y + 10, 1, 1); px(g, f, X + 8, Y + 10, 1, 1); px(g, f, X + 10, Y + 11, 1, 1);
+  }
+}
+
+export function drawGrave(g, o, cx, cy) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  px(g, 'rgba(0,0,0,0.3)', X + 2, Y + 13, 12, 3);
+  px(g, '#2e2a34', X + 3, Y + 1, 10, 14);
+  px(g, '#8a8698', X + 4, Y + 2, 8, 12);
+  px(g, '#a8a4b8', X + 4, Y + 2, 8, 2);
+  px(g, '#2e2a34', X + 3, Y + 1, 1, 1); px(g, '#2e2a34', X + 12, Y + 1, 1, 1);
+  // "RIP"
+  px(g, '#4a4658', X + 5, Y + 6, 1, 4); px(g, '#4a4658', X + 6, Y + 6, 1, 1); px(g, '#4a4658', X + 6, Y + 8, 1, 1);
+  px(g, '#4a4658', X + 8, Y + 6, 1, 4);
+  px(g, '#4a4658', X + 10, Y + 6, 1, 4); px(g, '#4a4658', X + 11, Y + 6, 1, 2);
+  px(g, '#3a6a30', X + 3, Y + 14, 3, 1); px(g, '#3a6a30', X + 11, Y + 14, 2, 1);
+}
+
+export function drawCandle(g, o, cx, cy, t) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  px(g, '#2a2a34', X + 4, Y + 13, 8, 2);
+  px(g, '#6a6a7a', X + 5, Y + 12, 6, 1);
+  px(g, '#e8e0c8', X + 6, Y + 6, 4, 7); px(g, '#ffffff', X + 6, Y + 6, 1, 7); px(g, '#b8b098', X + 9, Y + 6, 1, 7);
+  px(g, '#2a2a2a', X + 7, Y + 4, 1, 2);
+  if (o.lit) {
+    const f = Math.floor(t * 8 + o.x) % 2;
+    px(g, '#ff7a20', X + 6, Y + 0 + f, 3, 4); px(g, '#ffd040', X + 7, Y + 1 + f, 1, 3); px(g, '#ffffc0', X + 7, Y + 2 + f, 1, 1);
+  }
+}
+
+export function drawWallBat(g, o, cx, cy, t) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  const flap = Math.floor(t * 2 + o.x) % 4 === 0 ? 1 : 0;
+  px(g, '#1a1020', X + 7, Y + 2, 2, 1);
+  px(g, '#2a1a34', X + 5, Y + 3, 6, 6);
+  px(g, '#2a1a34', X + 1, Y + 4 - flap, 4, 4); px(g, '#2a1a34', X + 11, Y + 4 - flap, 4, 4);
+  px(g, '#4a3a5a', X + 6, Y + 4, 4, 3);
+  px(g, '#ff4040', X + 6, Y + 6, 1, 1); px(g, '#ff4040', X + 9, Y + 6, 1, 1);
+}
+
+export function drawWallSpider(g, o, cx, cy, t) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  g.fillStyle = 'rgba(230,230,240,0.7)';
+  for (let i = 0; i < 16; i += 4) { g.fillRect(X + i, Y + i / 2, 1, 1); g.fillRect(X + 15 - i, Y + i / 2, 1, 1); }
+  px(g, 'rgba(230,230,240,0.6)', X + 8, Y, 1, 6 + Math.round(Math.sin(t * 2) * 1.5));
+  const sy = Y + 7 + Math.round(Math.sin(t * 2) * 1.5);
+  px(g, '#1a1020', X + 6, sy, 5, 4);
+  px(g, '#1a1020', X + 4, sy, 1, 3); px(g, '#1a1020', X + 11, sy, 1, 3); px(g, '#1a1020', X + 5, sy + 4, 1, 2); px(g, '#1a1020', X + 10, sy + 4, 1, 2);
+  px(g, '#ff4040', X + 7, sy + 1, 1, 1); px(g, '#ff4040', X + 9, sy + 1, 1, 1);
+}
+
+export function drawCauldron(g, o, cx, cy, t) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  px(g, '#ff7a20', X + 4, Y + 13, 8, 2); px(g, '#ffd040', X + 6, Y + 13, 4, 1);
+  px(g, '#1a1a22', X + 1, Y + 4, 14, 10);
+  px(g, '#3a3a48', X + 2, Y + 5, 12, 8); px(g, '#5a5a6a', X + 3, Y + 5, 2, 7);
+  px(g, '#1a1a22', X, Y + 3, 16, 2);
+  px(g, '#58c040', X + 2, Y + 3, 12, 1);
+  for (let i = 0; i < 3; i++) {
+    const ph = (t * 1.5 + i / 3) % 1;
+    px(g, '#88f070', X + 4 + i * 4, Y + 2 - Math.round(ph * 6), 2, 2);
+  }
+}
+
+export function drawDeadTree(g, o, cx, cy) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  px(g, 'rgba(0,0,0,0.3)', X + 3, Y + 14, 10, 2);
+  px(g, '#2a1a12', X + 6, Y - 6, 4, 21);
+  px(g, '#4a3020', X + 7, Y - 6, 1, 21);
+  px(g, '#2a1a12', X + 2, Y - 4, 5, 2); px(g, '#2a1a12', X + 1, Y - 8, 2, 5);
+  px(g, '#2a1a12', X + 10, Y - 2, 4, 2); px(g, '#2a1a12', X + 13, Y - 6, 2, 5);
+  px(g, '#2a1a12', X + 8, Y - 12, 2, 7); px(g, '#2a1a12', X + 5, Y - 14, 3, 2);
 }

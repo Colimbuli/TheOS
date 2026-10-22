@@ -11,7 +11,7 @@ export function saveGame(game) {
     party: game.party.map((m) => m.id),
     stats: game.stats, step: game.step, owned: game.owned,
     diamonds: game.diamonds, ammo: game.ammo, hasCloak: game.hasCloak,
-    cave: game.cave, quizStats: game.quizStats, quizIntro: game.quizIntro,
+    cave: game.cave, haunt: game.haunt, quizStats: game.quizStats, quizIntro: game.quizIntro,
     seenHints: game.seenHints, checkpoint: game.checkpoint,
     bushes: game.bushes, treasures: game.treasures, kills: game.kills,
   };

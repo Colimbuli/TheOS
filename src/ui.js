@@ -227,3 +227,81 @@ export class ShopUI {
     text('A: kaufen   B: verlassen', W / 2, 148, { size: 5, align: 'center', color: '#8898c0' });
   }
 }
+
+// --- Rätsel (Spukhaus): mehrere richtige Antworten öffnen eine Tür ----------------
+
+export class RiddleUI {
+  // opts: { speaker, need, gen: () => {q, options, correct}, onSolved }
+  constructor(game, fx, opts) {
+    Object.assign(this, opts);
+    this.game = game; this.fx = fx;
+    this.got = 0; this.nav = navigator(); this.closed = false;
+    this.ask();
+  }
+
+  ask() {
+    this.qn = this.gen();
+    this.qn.lines = wrap(this.qn.q, 36).slice(0, 5);
+    this.qn.opt = this.qn.options.map((o) => wrap(o, 33).slice(0, 2));
+    this.mode = 'q'; this.sel = 0; this.result = null;
+  }
+
+  answer(i) {
+    const ok = i === this.qn.correct;
+    this.sel = i;
+    if (ok) { this.got++; this.game.diamonds++; this.fx.sfx.item(); }
+    else this.fx.sfx.hurt();
+    this.result = { ok };
+    this.mode = 'fb';
+  }
+
+  update(input, dt, tap) {
+    const n = this.qn.options.length;
+    const d = this.nav(input, dt);
+    if (this.mode === 'q') {
+      if (d) { this.sel = (this.sel + d + n) % n; this.fx.sfx.blip(); }
+      for (let i = 0; i < n; i++) if (hit(tap, 8, this.optY(i), 224, 18)) { this.answer(i); return; }
+      if (input.bPressed) { this.closed = true; return; }
+      if (input.aPressed) this.answer(this.sel);
+      return;
+    }
+    if (input.aPressed || tap) {
+      if (this.got >= this.need) { this.closed = true; this.onSolved(); return; }
+      this.ask();
+    } else if (input.bPressed) this.closed = true;
+  }
+
+  optY(i) { return 70 + i * 19 - (this.qn.options.length === 2 ? -10 : 0); }
+
+  render(g, text) {
+    panel(g);
+    diamondsHeader(g, text, this.game);
+    text(this.speaker, 9, 7, { size: 6, color: '#f8d848' });
+    text(`${Math.min(this.got, this.need)}/${this.need} richtig`, 150, 7, { size: 5, align: 'right', color: '#a8f070' });
+    const q = this.qn;
+    q.lines.forEach((l, i) => text(l, 10, 22 + i * 9, { size: 6 }));
+    q.opt.forEach((lines, i) => {
+      const y = this.optY(i);
+      let bg = i === this.sel ? '#3a58c8' : '#1c2850';
+      if (this.mode === 'fb') {
+        if (i === q.correct && this.result.ok) bg = '#2a8a3a';
+        else if (i === this.sel && !this.result.ok) bg = '#a83030';
+      }
+      g.fillStyle = bg; g.fillRect(8, y, 224, 18);
+      if (i === this.sel && this.mode === 'q') { g.fillStyle = '#f8d848'; g.fillRect(8, y, 2, 18); }
+      const off = lines.length === 1 ? 6 : 2;
+      text(String.fromCharCode(65 + i) + ')', 14, y + off, { size: 6, color: '#f8d848' });
+      lines.forEach((l, j) => text(l, 32, y + off + j * 8, { size: 6 }));
+    });
+    if (this.mode === 'fb') {
+      const ok = this.result.ok;
+      const done = this.got >= this.need;
+      // Bei falscher Antwort wird die Lösung NICHT verraten – sonst könnte man raten und merken
+      const msg = ok ? (done ? 'Geschafft! Rätsel gelöst!' : 'Richtig! +1 Diamant') : 'Leider falsch. Neue Frage!';
+      text(msg, W / 2, 147, { size: 6, align: 'center', color: ok ? '#a8f070' : '#ff9090' });
+      text('A: weiter', W / 2, 155, { size: 5, align: 'center', color: '#8898c0' });
+    } else {
+      text('A: antworten   B: aufgeben', W / 2, 151, { size: 5, align: 'center', color: '#8898c0' });
+    }
+  }
+}

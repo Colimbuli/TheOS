@@ -225,6 +225,11 @@ const ITEM_PAINT = {
     const pal = { o: '#1a1020', m: '#7a4ac8', M: '#b090f0' };
     rows.forEach((r, y) => [...r].forEach((ch, x) => { if (pal[ch]) px(pal[ch], x + 1, y + 2); }));
   },
+  candy: (px) => {
+    px('#1a1020', 1, 4, 10, 5);
+    px('#e83a8a', 3, 5, 6, 3); px('#ff9ac8', 4, 5, 2, 1);
+    px('#f0c838', 0, 3, 2, 2); px('#f0c838', 0, 7, 2, 2); px('#f0c838', 10, 3, 2, 2); px('#f0c838', 10, 7, 2, 2);
+  },
   chestnut: (px) => { px('#2a1408', 0, 0, 4, 4); px('#8a4a1a', 1, 0, 2, 4); px('#8a4a1a', 0, 1, 4, 2); px('#c88040', 1, 1, 1, 1); },
 };
 
@@ -237,5 +242,65 @@ export function fireSprite(frame, reflected) {
   return canvasSprite(`fire${frame}${reflected}`, 8, 8, (px, ell) => {
     const [a, b, c] = reflected ? ['#ffffff', '#a8e8ff', '#3a8af0'] : ['#fff6b0', '#ffb040', '#e85020'];
     ell(4, 4, 4 - frame * 0.5, 4 - frame * 0.5, (dx, dy, d) => (d < 0.25 ? a : d < 0.6 ? b : c));
+  });
+}
+
+// --- Spukhaus-Figuren ------------------------------------------------------------
+
+const GHOST_TINT = { white: ['#f4f4fc', '#c8c8dc'], blue: ['#d8ecff', '#98bce8'], green: ['#e0ffe8', '#a0d8b0'] };
+
+export function ghostSprite(tint = 'white', frame = 0, glasses = false) {
+  return canvasSprite(`ghost${tint}${frame}${glasses}`, 16, 18, (px, ell) => {
+    const [c, d] = GHOST_TINT[tint];
+    ell(8, 7, 6.5, 6.5, (dx, dy, dd) => (dd > 0.85 ? '#5a5a78' : dx > 0.4 ? d : c));
+    px('#5a5a78', 1, 7, 1, 8); px('#5a5a78', 14, 7, 1, 8);
+    px(c, 2, 7, 12, 7); px(d, 11, 7, 3, 7);
+    for (let x = 1; x < 15; x += 3) { const o = (x + frame) % 2; px(c, x + 1, 14 + o, 2, 2); px('#5a5a78', x, 14 + o, 1, 2); }
+    px('#1a1020', 5, 6, 2, 3); px('#1a1020', 9, 6, 2, 3);
+    px('#1a1020', 7, 10, 2, 2);
+    if (glasses) { px('#3a2a10', 4, 5, 4, 1); px('#3a2a10', 8, 5, 4, 1); px('#3a2a10', 4, 5, 1, 4); px('#3a2a10', 11, 5, 1, 4); px('#3a2a10', 4, 9, 8, 1); }
+  });
+}
+
+export function witchSprite(frame = 0) {
+  return canvasSprite(`witch${frame}`, 16, 22, (px) => {
+    // Hut
+    px('#1a1020', 7, 0, 3, 2); px('#1a1020', 6, 2, 5, 3); px('#1a1020', 5, 5, 7, 2); px('#1a1020', 1, 7, 15, 2);
+    px('#5a2a7a', 7, 1, 2, 1); px('#5a2a7a', 7, 3, 3, 2); px('#5a2a7a', 6, 5, 5, 2);
+    px('#f0c838', 6, 6, 5, 1);
+    // Gesicht
+    px('#1a1020', 3, 9, 10, 6); px('#a8d890', 4, 9, 8, 5);
+    px('#1a1020', 5, 11, 1, 1); px('#1a1020', 10, 11, 1, 1); px('#78a860', 7, 11, 2, 2); px('#c84a4a', 6, 13, 4, 1);
+    px('#8a3ac8', 2, 9, 2, 6); px('#8a3ac8', 12, 9, 2, 6); // Haare
+    // Kleid
+    px('#1a1020', 2, 15, 12, 7); px('#5a2a7a', 3, 15, 10, 6); px('#7a4a9a', 3, 15, 2, 6);
+    px('#f0c838', 7, 16, 2, 1);
+    px('#3a2a1a', 4, 21, 3, 1); px('#3a2a1a', 9, 21, 3, 1);
+    if (frame) { px('#a8d890', 13, 16, 2, 2); px('#ffffff', 14, 14, 1, 1); }
+  });
+}
+
+export function grafSprite(frame = 0) {
+  return canvasSprite(`graf${frame}`, 18, 22, (px, ell) => {
+    // Kürbiskopf mit Krone
+    px('#f0c838', 5, 0, 8, 3); px('#f0c838', 5, 0, 1, 1); px('#1a1020', 6, 0, 1, 1); px('#1a1020', 8, 0, 1, 1); px('#1a1020', 10, 0, 1, 1);
+    px('#e83a3a', 8, 1, 2, 1);
+    ell(9, 8, 7.5, 5.5, (dx, dy, dd) => (dd > 0.8 ? '#3a1a08' : dx < -0.4 ? '#f8a040' : '#e07a20'));
+    const f = frame ? '#fff060' : '#ffc030';
+    px('#2a1008', 5, 6, 3, 2); px(f, 6, 6, 1, 1); px('#2a1008', 10, 6, 3, 2); px(f, 11, 6, 1, 1);
+    px('#2a1008', 5, 10, 8, 2); px(f, 6, 10, 1, 1); px(f, 9, 10, 1, 1); px(f, 11, 11, 1, 1);
+    // Umhang
+    px('#1a1020', 2, 13, 14, 9); px('#7a1a2a', 3, 14, 12, 7); px('#a82a3a', 3, 14, 3, 7);
+    px('#e8e0d0', 7, 13, 4, 3); px('#f0c838', 8, 16, 2, 1);
+  });
+}
+
+export function batSprite(frame = 0) {
+  return canvasSprite(`bat${frame}`, 16, 12, (px) => {
+    px('#1a1020', 6, 3, 4, 6); px('#3a2a4a', 7, 4, 2, 4);
+    px('#1a1020', 6, 2, 1, 1); px('#1a1020', 9, 2, 1, 1);
+    px('#ff4040', 7, 5, 1, 1); px('#ff4040', 8, 5, 1, 1);
+    if (frame) { px('#2a1a34', 1, 1, 5, 3); px('#2a1a34', 10, 1, 5, 3); px('#2a1a34', 0, 0, 2, 2); px('#2a1a34', 14, 0, 2, 2); }
+    else { px('#2a1a34', 1, 5, 5, 3); px('#2a1a34', 10, 5, 5, 3); px('#2a1a34', 0, 7, 2, 2); px('#2a1a34', 14, 7, 2, 2); }
   });
 }

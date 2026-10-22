@@ -4,6 +4,7 @@ import {
   makeMap, T, TILE, rng, ROOFS,
   drawHouse, drawFountain, drawStall, drawLever, drawSign, drawHouseSign, drawTorch, drawStatue,
   drawBlackboard, drawDesk, drawShelf, drawCounter, drawBarrel, drawPlant, drawWindow,
+  drawPumpkin, drawGrave, drawCandle, drawWallBat, drawWallSpider, drawCauldron, drawDeadTree,
 } from './world.js';
 
 function addObj(b, o, draw, sortY) {
@@ -242,6 +243,121 @@ export function createCave() {
     [15, 1, 15, 6, 15 * TILE, 6 * TILE, 1],
     [1, 1, 14, 8, 13 * TILE, 2 * TILE, 2],
     [1, 10, 5, 13, 2 * TILE, 11 * TILE, 0],
+  ];
+  return map;
+}
+
+// --- Kapitel 3: Das Spukhaus am Buttenberg ---------------------------------------
+//
+// Garten (unten) mit Hexe Kunigunde → Gartentor (Division) → Haustür (Gespenst Bodo, Halloween-Englisch)
+// → Halle (Zähl-Rätsel von Zora) → Bibliothek (Truhe: Felix, Prof. Plumps: Lehrbuch-Englisch)
+// → Kerzenraum (Binärcode mit Kerzen) → Thronsaal (Graf Kürbis: Mondschlüssel) → Turm mit Treppe.
+
+export const HAUNT_SPAWN = { x: 15 * TILE + 8, y: 19 * TILE, dir: 1 };
+export const CANDLE_VALUES = [16, 8, 4, 2, 1];
+
+export function createHaunted() {
+  const { map, b } = makeMap({ id: 'haunted', w: 32, h: 24, fill: T.GRASS, edge: T.TREE, theme: 'haunted' });
+  const r = rng(7);
+  for (let i = 0; i < 25; i++) b.set(2 + ((r() * 28) | 0), 15 + ((r() * 7) | 0), T.FLOWER);
+  b.rect(0, 0, 32, 1, T.TREE); b.rect(0, 22, 32, 2, T.TREE);
+  b.rect(0, 0, 2, 24, T.TREE); b.rect(30, 0, 2, 24, T.TREE);
+
+  // Haus: Mauern, dann Räume ausschneiden
+  b.rect(4, 1, 24, 12, T.IWALL);
+  const room = (x, y, w, h) => b.rect(x, y, w, h, T.WOOD);
+  room(5, 2, 6, 4);    // Kerzenraum
+  room(12, 2, 8, 4);   // Thronsaal
+  room(21, 2, 6, 10);  // Turm
+  room(5, 7, 6, 5);    // Bibliothek
+  room(12, 7, 8, 5);   // Halle
+  b.rect(14, 3, 4, 3, T.RUG);
+
+  // Garten
+  b.rect(2, 14, 28, 1, T.FENCE);
+  b.rect(15, 13, 1, 1, T.PATH);
+  b.rect(15, 15, 2, 6, T.PATH);
+  b.set(15, 21, T.UP); b.set(16, 21, T.UP);
+  for (const [x, y] of [[5, 20], [26, 21]]) b.set(x, y, T.DIG);
+
+  // Rätseltüren
+  map.riddles = {
+    gate: { x: 15, y: 14, open: T.PATH, need: 2, speaker: 'Hexe Kunigunde', kind: 'division' },
+    front: { x: 15, y: 12, open: T.WOOD, need: 2, speaker: 'Gespenst Bodo', kind: 'halloween' },
+    count: { x: 11, y: 9, open: T.WOOD, need: 2, speaker: 'Gespenst Zora', kind: 'count' },
+    lib: { x: 7, y: 6, open: T.WOOD, need: 3, speaker: 'Professor Plumps', kind: 'book' },
+    candles: { x: 11, y: 4, open: T.WOOD, kind: 'candles' },
+  };
+  b.set(15, 14, T.RGATE);
+  for (const k of ['front', 'count', 'lib', 'candles']) b.set(map.riddles[k].x, map.riddles[k].y, T.RDOOR);
+  b.set(20, 3, T.LOCKED);   // Turmtür – Mondschlüssel
+  b.set(24, 10, T.DOWN);    // Treppe zur Drachenhöhle
+  map.riddleAt = (tx, ty) => Object.entries(map.riddles).find(([, d]) => d.x === tx && d.y === ty) || null;
+
+  // Truhe vor der Bibliothekstür (Felix)
+  b.under(7, 7, T.WOOD); b.set(7, 7, T.BOULDER);
+
+  // Gartendeko
+  const solidObj = (o, draw) => { addObj(b, o, draw); b.solid(o.x, o.y); };
+  for (const [x, y] of [[4, 17], [6, 19], [9, 16], [22, 17], [25, 19], [27, 16], [11, 20]]) solidObj({ type: 'grave', x, y }, drawGrave);
+  for (const [x, y, lit] of [[12, 18, true], [19, 18, true], [20, 16, false], [8, 21, true], [13, 13, true], [18, 13, true], [24, 13, false], [7, 13, true]]) {
+    solidObj({ type: 'pumpkin', x, y, lit, glow: lit }, drawPumpkin);
+  }
+  for (const [x, y] of [[3, 15], [28, 20], [21, 20]]) solidObj({ type: 'deadtree', x, y }, drawDeadTree);
+  solidObj({ type: 'cauldron', x: 12, y: 16, glow: true }, drawCauldron);
+
+  // Halle: hier wird gezählt!
+  const hall = { pumpkin: 0, candle: 0, bat: 0, spider: 0 };
+  for (const [x, y] of [[13, 7], [18, 7], [19, 10]]) { solidObj({ type: 'pumpkin', x, y, lit: true, glow: true }, drawPumpkin); hall.pumpkin++; }
+  for (const [x, y] of [[12, 7], [19, 7], [12, 11], [14, 11]]) { solidObj({ type: 'candle', x, y, lit: true, glow: true }, drawCandle); hall.candle++; }
+  // Fledermäuse und Spinne mitten in der Halle, damit man sie gut zählen kann
+  for (const [x, y] of [[14, 8], [17, 9]]) { addObj(b, { type: 'wallbat', x, y }, drawWallBat, 99 * TILE); hall.bat++; }
+  addObj(b, { type: 'wallspider', x: 18, y: 11 }, drawWallSpider, 99 * TILE); hall.spider++;
+  map.hallCounts = hall;
+  map.padTop = 48; // Kamera darf über den oberen Rand in den Nachthimmel – sonst verdeckt das HUD die oberen Räume
+
+  // Bibliothek
+  addObj(b, { type: 'shelf', x: 5, y: 6, w: 2 }, drawShelf, 0);
+  addObj(b, { type: 'shelf', x: 8, y: 6, w: 3 }, drawShelf, 0);
+  for (const [x, y] of [[5, 10], [10, 8]]) { addObj(b, { type: 'desk', x, y, w: 1, book: true }, drawDesk); b.solid(x, y); }
+
+  // Kerzenraum: 5 schaltbare Kerzen (16 8 4 2 1)
+  map.candles = CANDLE_VALUES.map((v, i) => addObj(b, { type: 'candle', x: 6 + i, y: 2, lit: false, glow: false, value: v }, drawCandle));
+  for (const c of map.candles) b.solid(c.x, c.y);
+  map.labels = CANDLE_VALUES.map((v, i) => ({ x: (6 + i) * TILE + 8, y: 1 * TILE + 5, text: String(v) }));
+
+  // Thronsaal & Turm
+  for (const [x, y] of [[12, 2], [19, 2], [21, 2], [26, 2]]) solidObj({ type: 'candle', x, y, lit: true, glow: true }, drawCandle);
+  addObj(b, { type: 'wallspider', x: 25, y: 1 }, drawWallSpider, 0);
+  addObj(b, { type: 'wallbat', x: 22, y: 1 }, drawWallBat, 0);
+
+  // Figuren
+  const npc = (id, custom, x, y, extra = {}) => map.npcs.push({ id, custom, x: x * TILE, y: y * TILE, dir: 0, anim: 0, moving: false, ...extra });
+  npc('witch', 'witch', 13, 15.5);
+  npc('bodo', 'ghost', 17, 12.6);
+  npc('zora', 'ghostGreen', 13, 9.4);
+  npc('plumps', 'ghostGlasses', 9, 10);
+  npc('bit', 'ghostBlue', 6, 4.2);
+  npc('graf', 'graf', 16, 1.8);
+
+  // Gegenstände und Gegner
+  const item = (type, x, y, id) => map.items.push({ id, type, x: x * TILE + 2, y: y * TILE + 2, taken: false });
+  item('candy', 7, 18, 'h1'); item('candy', 24, 16, 'h2'); item('candy', 27, 21, 'h3');
+  item('apple', 3, 21, 'h4'); item('candy', 25, 6, 'h5'); item('candy', 6, 8, 'h6');
+  map.enemySpawns = [{ type: 'bat', x: 8, y: 18 }, { type: 'bat', x: 23, y: 18 }, { type: 'bat', x: 26, y: 15 }];
+
+  map.hints = [
+    [12, 15, 19, 21, 'Halloween-Nacht am Buttenberg! Das Spukhaus versperrt den Weg zur Drachenhöhle.'],
+    [5, 13, 26, 13, 'Ein Gespenst wartet an der Haustür...'],
+    [12, 7, 19, 11, 'Die Halle ist voller Gruselzeug. Schau genau hin, was hier alles steht!'],
+    [5, 7, 10, 11, 'Eine Bibliothek – aber eine schwere Truhe versperrt die Tür. Ein Fall für Felix!'],
+    [5, 2, 10, 5, 'Fünf Kerzen ... und ein kleines Gespenst mit Brille. Sprich mit ihm!'],
+    [12, 2, 19, 5, 'Der Thronsaal von Graf Kürbis!'],
+    [21, 2, 26, 11, 'Eine Treppe führt hinab zur Drachenhöhle ...'],
+  ];
+  map.checkpoints = [
+    [2, 15, 29, 21, HAUNT_SPAWN.x, HAUNT_SPAWN.y, 1],
+    [5, 13, 26, 13, 15 * TILE + 8, 15 * TILE, 1],
   ];
   return map;
 }

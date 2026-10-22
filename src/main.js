@@ -7,11 +7,12 @@
 import { initInput, pollInput, input, isTouch } from './input.js';
 import { sfx, unlockAudio } from './audio.js';
 import { drawTiles, T, TILE, COL, drawDiamond } from './world.js';
-import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN } from './maps.js';
-import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite } from './sprites.js';
+import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES } from './maps.js';
+import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite } from './sprites.js';
 import { createNPCs, talkTo, arneDoor, LEVER_DIALOG, HEROES, questHint, ABILITY_NAME } from './npcs.js';
 import { Dialog } from './dialog.js';
-import { QuizUI, ShopUI } from './ui.js';
+import { QuizUI, ShopUI, RiddleUI } from './ui.js';
+import * as HW from './halloween.js';
 import { saveGame, loadGame } from './save.js';
 
 const W = 240, H = 160;
@@ -40,7 +41,7 @@ const leader = () => game.party[0];
 const map = () => game.maps[game.mapId];
 
 function newGame() {
-  const maps = { village: createVillage(), school: createSchool(), shop: createShop(), cave: createCave() };
+  const maps = { village: createVillage(), school: createSchool(), shop: createShop(), cave: createCave(), haunted: createHaunted() };
   maps.village.npcs = createNPCs();
   game = {
     state: 'title', time: 0, titleT: 0, endT: 0, menu: 0,
@@ -51,6 +52,8 @@ function newGame() {
     cave: { dug: false, boulder: false, key: false, door: false, statue: false, troll: false, lever: false,
       secret: false, done: false, taken: [], dugCells: [] },
     quizStats: { de: { r: 0, n: 0 }, en: { r: 0, n: 0 }, geo: { r: 0, n: 0 }, ma: { r: 0, n: 0 } },
+    haunt: { gate: false, front: false, count: false, chest: false, lib: false, candles: false, king: false, door6: false,
+      done: false, target: 5 + Math.floor(Math.random() * 27), taken: [] },
     quizIntro: false, seenHints: {},
     challenge: { active: false, blocked: 0, timer: 0 },
     cloak: { x: 6 * TILE + 3, y: 19 * TILE + 2, taken: false },
@@ -60,6 +63,7 @@ function newGame() {
     ui: null, saveT: 0, dropN: 0,
   };
   spawnEnemies(maps.cave);
+  spawnEnemies(maps.haunted);
 }
 
 // Gespeicherten Stand auf frisch aufgebaute Karten anwenden
@@ -85,13 +89,22 @@ function applySave(d) {
   if (cv.statue) c.killStatue();
   if (cv.lever) { c.setTile(2, 9, T.CFLOOR); c.lever.pulled = true; }
   for (const it of c.items) if (cv.taken.includes(it.id)) it.taken = true;
+  if (d.haunt) {
+    Object.assign(game.haunt, d.haunt);
+    const hm = game.maps.haunted, h = game.haunt;
+    for (const [id, r] of Object.entries(hm.riddles)) if (h[id]) hm.setTile(r.x, r.y, r.open);
+    if (h.chest) { hm.setTile(7, 7, T.WOOD); hm.setTile(8, 7, T.BOULDER); }
+    if (h.candles) setCandles(h.target);
+    if (h.door6) hm.setTile(20, 3, T.WOOD);
+    for (const it of hm.items) if (h.taken.includes(it.id)) it.taken = true;
+  }
   game.mapId = d.mapId;
   game.state = 'play';
 }
 
 function spawnEnemies(m) {
   m.enemies = (m.enemySpawns || []).map((s, i) => ({
-    id: i, type: s.type, x: s.x * TILE, y: s.y * TILE, hp: s.type === 'slime' ? 2 : 3,
+    id: i, type: s.type, x: s.x * TILE, y: s.y * TILE, hp: { slime: 2, kobold: 3, bat: 1 }[s.type],
     cd: 1 + Math.random() * 1.5, hurtT: 0, alive: true, anim: Math.random() * 3, flip: false, throwT: 0,
   }));
 }
@@ -131,6 +144,7 @@ const fx = {
   },
   openQuiz() { game.ui = new QuizUI(game, fx); },
   openShop() { game.ui = new ShopUI(game, fx); },
+  openRiddle(id) { openRiddle(id); },
 };
 
 function float(text, x, y, color = '#f8d848') { game.floats.push({ text, x, y, t: 1.1, color }); }
@@ -203,7 +217,8 @@ function goTo(mapId, x, y, dir) {
   game.challenge.active = false;
   game.fadeT = 0.35;
   game.banners = game.banners.slice(-1);
-  if (mapId === 'cave' && !game.checkpoint) game.checkpoint = { ...CAVE_SPAWN };
+  if (mapId === 'cave') game.checkpoint = { map: 'cave', ...CAVE_SPAWN };
+  if (mapId === 'haunted') game.checkpoint = { map: 'haunted', ...HAUNT_SPAWN };
   save();
 }
 
@@ -289,10 +304,15 @@ function update(dt) {
     game.endT += dt;
     if (game.endT > 1.5 && (input.aPressed || tap)) {
       game.state = 'play';
-      const L = leader();
-      L.x = 3 * TILE; L.y = 10 * TILE + 8; L.dir = 1;
-      regroup();
-      save();
+      if (game.endChapter === 2) {
+        goTo('haunted', HAUNT_SPAWN.x, HAUNT_SPAWN.y, HAUNT_SPAWN.dir);
+        fx.banner('KAPITEL 3', 'Das Spukhaus am Buttenberg', '#ffb040');
+      } else {
+        const L = leader();
+        L.x = 24 * TILE; L.y = 8 * TILE; L.dir = 0;
+        regroup();
+        save();
+      }
     }
     return;
   }
@@ -425,6 +445,18 @@ function interact() {
   }
 
   if (m.isLever && m.isLever(tx, ty)) { pullLever(); return; }
+  if (m.id === 'haunted') {
+    const c = m.candles.find((k) => k.x === tx && k.y === ty);
+    if (c) { toggleCandle(c); return; }
+    const rd = m.riddleAt(tx, ty);
+    if (rd) {
+      const [id] = rd;
+      if (id === 'candles') {
+        dialog.open([`Auf der Tür steht: "Zeige die ${game.haunt.target} mit den Kerzen!"`, 'Darunter: 16 – 8 – 4 – 2 – 1. Bit, das kleine Gespenst, erklärt dir, wie das geht.']);
+      } else openRiddle(id);
+      return;
+    }
+  }
   if (m.id === 'village' && tx === 24 && ty === 7 && game.step === 2) { open(arneDoor(game, fx)); return; }
 
   const text = m.textAt(tx, ty);
@@ -433,7 +465,15 @@ function interact() {
   if (t === T.GATE) dialog.open(['Das Tor zum Buttenberg ist fest verschlossen.', 'Der Hebel dafür ist gleich daneben – direkt vor Konrads Nase.']);
   else if (t === T.BOULDER) dialog.open(['Ein riesiger Felsbrocken. Dafür braucht man Felix\' Superstärke!']);
   else if (t === T.DIG || t === T.EWALL) dialog.open(['Lockere Erde. Hier könnte Arne graben...']);
-  else if (t === T.LOCKED) {
+  else if (t === T.LOCKED && m.id === 'haunted') {
+    if (game.haunt.king) {
+      m.setTile(tx, ty, T.WOOD);
+      game.haunt.door6 = true;
+      sfx.door();
+      fx.toast('Der Mondschlüssel passt! Die Turmtür ist offen.', 3);
+      save();
+    } else dialog.open(['Eine Tür mit silbernem Mondschloss. Graf Kürbis hat bestimmt den Schlüssel.']);
+  } else if (t === T.LOCKED) {
     if (game.cave.key) {
       m.setTile(tx, ty, T.CFLOOR);
       game.cave.door = true;
@@ -550,6 +590,7 @@ function felixStrength(L, tx, ty, t) {
       burst(tx * TILE + 8 + dx * 8, ty * TILE + 14, ['#c8b49a', '#9c8670'], 8);
       float('Hau-Ruck!', L.x + 8, L.y - 6, '#ffffff');
       if (m.id === 'cave' && !game.cave.boulder) { game.cave.boulder = true; fx.gainXP(5); save(); }
+      if (m.id === 'haunted' && !game.haunt.chest) { game.haunt.chest = true; fx.gainXP(5); save(); }
     } else { sfx.bump(); float('Klemmt!', L.x + 8, L.y - 6, '#ffb0b0'); }
     return;
   }
@@ -620,7 +661,7 @@ function hurt(n) {
   game.hurtT = 1;
   sfx.hurt();
   if (st.hearts > 0 || game.challenge.active) return;
-  if (game.mapId === 'cave') {
+  if (game.mapId === 'cave' || game.mapId === 'haunted') {
     st.hearts = 0;
     game.faintT = 1.6;
     game.invisT = 0;
@@ -629,7 +670,8 @@ function hurt(n) {
 }
 
 function respawn() {
-  const cp = game.checkpoint || CAVE_SPAWN;
+  let cp = game.checkpoint;
+  if (!cp || cp.map !== game.mapId) cp = game.mapId === 'haunted' ? HAUNT_SPAWN : CAVE_SPAWN;
   const L = leader();
   L.x = cp.x; L.y = cp.y; L.dir = cp.dir;
   regroup();
@@ -647,7 +689,7 @@ function damageEnemy(e, dmg, kx = 0, ky = 0) {
   game.kills++;
   sfx.pop();
   burst(e.x + 8, e.y + 8, CONFETTI, 18, 60);
-  fx.gainXP(e.type === 'slime' ? 3 : 6, e.x + 8, e.y);
+  fx.gainXP({ slime: 3, kobold: 6, bat: 2 }[e.type], e.x + 8, e.y);
   if (e.type === 'kobold' && Math.random() < 0.6) {
     map().items.push({ id: `drop${game.dropN++}`, type: 'bag', x: e.x + 2, y: e.y + 2, taken: false, drop: true });
   }
@@ -667,7 +709,11 @@ function updateEnemies(dt) {
     const nx = dx / d, ny = dy / d;
     const sees = visible && d < 110 && lineOfSight(e.x + 8, e.y + 10, lx, ly);
 
-    if (e.type === 'slime') {
+    if (e.type === 'bat') {
+      const wob = Math.sin(e.anim * 5 + e.id) * 30;
+      if (sees && d < 90) moveEnemy(e, (nx * 38 - ny * wob * 0.5) * dt, (ny * 38 + nx * wob * 0.5) * dt);
+      else moveEnemy(e, Math.cos(e.anim * 1.3 + e.id) * 22 * dt, Math.sin(e.anim * 2.1 + e.id) * 14 * dt);
+    } else if (e.type === 'slime') {
       const hop = Math.sin(e.anim * 7) > 0;
       if (sees && hop) moveEnemy(e, nx * 34 * dt, ny * 34 * dt);
       else if (!sees && hop) moveEnemy(e, Math.cos(e.anim * 0.7 + e.id) * 10 * dt, Math.sin(e.anim * 0.9 + e.id) * 10 * dt);
@@ -859,10 +905,11 @@ function checkPickups() {
     const st = game.stats;
     if (it.type === 'apple' && st.hearts >= st.maxHearts) continue;
     it.taken = true;
-    if (!it.drop) game.cave.taken.push(it.id);
+    if (!it.drop) (m.id === 'haunted' ? game.haunt.taken : game.cave.taken).push(it.id);
     sfx.item();
     switch (it.type) {
       case 'crystal': game.diamonds += 2; fx.toast('Ein Kristall! +2 Diamanten', 2.5); break;
+      case 'candy': game.diamonds++; fx.toast('Ein Bonbon! Trick or treat! +1 Diamant', 2.5); break;
       case 'apple': st.hearts = Math.min(st.maxHearts, st.hearts + 1); fx.toast('Mmh, ein Apfel! +1 Herz', 2); break;
       case 'bag':
         game.ammo += 10;
@@ -904,7 +951,7 @@ function checkAreas() {
     fx.toast(text, 5);
   });
   for (const [x0, y0, x1, y1, x, y, dir] of m.checkpoints) {
-    if (tx >= x0 && tx <= x1 && ty >= y0 && ty <= y1) game.checkpoint = { x, y, dir };
+    if (tx >= x0 && tx <= x1 && ty >= y0 && ty <= y1) game.checkpoint = { map: m.id, x, y, dir };
   }
 }
 
@@ -925,13 +972,92 @@ function checkWarps() {
     if (t === T.UP) goTo('village', 15 * TILE + 8, 2 * TILE, 0);
     else if (t === T.DOWN) {
       endInvisibility(true);
+      if (game.cave.done) { goTo('haunted', HAUNT_SPAWN.x, HAUNT_SPAWN.y, HAUNT_SPAWN.dir); return; }
       game.cave.done = true;
-      game.state = 'end';
-      game.endT = 0;
-      sfx.levelUp();
-      save();
+      endChapter(2);
     }
   }
+  if (m.id === 'haunted') {
+    const t = m.tile(tx, ty);
+    if (t === T.UP) goTo('cave', 3 * TILE, 10 * TILE + 8, 1);
+    else if (t === T.DOWN) { endInvisibility(true); game.haunt.done = true; endChapter(3); }
+  }
+}
+
+function endChapter(n) {
+  game.endChapter = n;
+  game.state = 'end';
+  game.endT = 0;
+  sfx.levelUp();
+  save();
+}
+
+// --- Kapitel 3: Rätsel im Spukhaus ---------------------------------------------------
+
+const pickFn = (...fns) => fns[Math.floor(Math.random() * fns.length)]();
+
+function riddleGen(kind) {
+  switch (kind) {
+    case 'division': return () => HW.toQuestion(HW.division(true));
+    case 'halloween': return () => HW.toQuestion(pickFn(HW.whoAmI, HW.halloweenVocab, HW.reading, HW.sentenceOrder));
+    case 'count': return () => HW.toQuestion(HW.countQuestion(game.maps.haunted.hallCounts, 'in the hall'));
+    case 'book': return () => HW.toQuestion(pickFn(HW.bookVocab, HW.bookGrammar, HW.sentenceOrder));
+    case 'binary': return () => HW.toQuestion(pickFn(() => HW.binaryRead(true), HW.binaryRead, HW.binaryWrite));
+    default: return () => HW.toQuestion(pickFn(HW.mathRiddle, HW.englishRiddle));
+  }
+}
+
+function openRiddle(id) {
+  const m = game.maps.haunted, h = game.haunt;
+  if (id === 'bit') {
+    game.ui = new RiddleUI(game, fx, { speaker: 'Bit, das Computer-Gespenst', need: 3, gen: riddleGen('binary'),
+      onSolved() { fx.toast('Super geübt! Jetzt die Kerzen an der Tür ...', 3); } });
+    return;
+  }
+  if (id === 'king') {
+    game.ui = new RiddleUI(game, fx, { speaker: 'Graf Kürbis', need: 3, gen: riddleGen('mixed'),
+      onSolved() {
+        h.king = true;
+        sfx.levelUp();
+        fx.banner('MONDSCHLÜSSEL!', 'Er öffnet die Turmtür', '#f8d848');
+        fx.gainXP(20);
+        save();
+      } });
+    return;
+  }
+  const r = m.riddles[id];
+  if (!r || h[id]) return;
+  if (id === 'lib' && !h.chest) { dialog.open(['Professor Plumps: Erst muss die schwere Truhe weg. Ich bin nur ein Gespenst – ich kann nichts schieben!']); return; }
+  game.ui = new RiddleUI(game, fx, { speaker: r.speaker, need: r.need, gen: riddleGen(r.kind),
+    onSolved() { solveDoor(id); } });
+}
+
+function solveDoor(id) {
+  const m = game.maps.haunted, r = m.riddles[id];
+  game.haunt[id] = true;
+  m.setTile(r.x, r.y, r.open);
+  sfx.door();
+  burst(r.x * TILE + 8, r.y * TILE + 8, ['#c8a0ff', '#ffffff', '#f8d848'], 16, 50);
+  fx.banner(id === 'gate' ? 'DAS TOR IST OFFEN' : 'DIE TÜR IST OFFEN', 'Weiter geht\'s!', '#a8f070');
+  fx.gainXP(10);
+  save();
+}
+
+// Kerzen auf eine Zahl setzen (z. B. nach dem Laden)
+function setCandles(n) {
+  const bits = HW.toBits(n);
+  game.maps.haunted.candles.forEach((c, i) => { c.lit = bits[i] === '1'; c.glow = c.lit; });
+}
+
+function toggleCandle(c) {
+  const h = game.haunt;
+  if (h.candles) { fx.toast('Die Tür ist schon offen.', 1.5); return; }
+  c.lit = !c.lit;
+  c.glow = c.lit;
+  sfx[c.lit ? 'confirm' : 'blip']();
+  const sum = game.maps.haunted.candles.reduce((s, k) => s + (k.lit ? k.value : 0), 0);
+  float(`= ${sum}`, c.x * TILE + 8, c.y * TILE - 2, sum === h.target ? '#a8f070' : '#ffffff');
+  if (sum === h.target) solveDoor('candles');
 }
 
 function updateEffects(dt) {
@@ -956,9 +1082,10 @@ function camera() {
   }
   const L = leader();
   const clamp = (v, max) => Math.max(0, Math.min(max, v));
+  const pad = m.padTop || 0;
   return {
     x: Math.round(clamp(L.x + 8 - W / 2, m.w * TILE - W)),
-    y: Math.round(clamp(L.y + 8 - H / 2, m.h * TILE - H)),
+    y: Math.round(Math.max(-pad, Math.min(m.h * TILE - H, L.y + 8 - H / 2))),
   };
 }
 
@@ -979,6 +1106,25 @@ function drawCharacter(e, cam, alpha = 1) {
   const sx = Math.round(e.x - cam.x), sy = Math.round(e.y - cam.y);
   if (e.big) {
     g.drawImage(trollSprite(game.trollAngry > 0 ? 1 : 0), sx - 4, sy - 10);
+    return;
+  }
+  if (e.custom) {
+    const f = Math.floor(game.time * 3 + e.x) % 2;
+    const bob = Math.round(Math.sin(game.time * 2.5 + e.x) * 1.5);
+    let spr;
+    switch (e.custom) {
+      case 'witch': spr = witchSprite(f); break;
+      case 'graf': spr = grafSprite(f); break;
+      case 'ghostGreen': spr = ghostSprite('green', f); break;
+      case 'ghostBlue': spr = ghostSprite('blue', f, true); break;
+      case 'ghostGlasses': spr = ghostSprite('white', f, true); break;
+      default: spr = ghostSprite('white', f);
+    }
+    const ghost = e.custom.startsWith('ghost');
+    g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(sx + 4, sy + 15, 8, 2);
+    g.globalAlpha = ghost ? 0.85 : 1;
+    g.drawImage(spr, sx + Math.round((16 - spr.width) / 2), sy + 16 - spr.height + (ghost ? bob - 2 : 0));
+    g.globalAlpha = 1;
     return;
   }
   g.globalAlpha = alpha;
@@ -1042,8 +1188,18 @@ function bubble(e, cam) {
 
 function renderWorld(cam) {
   const m = map();
-  g.fillStyle = '#000';
+  g.fillStyle = m.theme === 'haunted' ? '#0c0a24' : '#000';
   g.fillRect(0, 0, W, H);
+  if (m.theme === 'haunted' && cam.y < 0) {
+    // Sternenhimmel und Vollmond über dem Spukhaus
+    for (let i = 0; i < 40; i++) {
+      const sx = (i * 97 + 13) % W, sy = ((i * 53) % 48) - 48 - cam.y;
+      if (sy < -cam.y) { g.fillStyle = i % 5 ? '#c8c8f0' : '#ffffff'; g.fillRect(sx, sy, 1, 1); }
+    }
+    const mx = 200 - cam.x * 0.2, my = -30 - cam.y;
+    g.fillStyle = '#f8f0c8'; g.beginPath(); g.arc(mx, my, 11, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#e0d8a8'; g.fillRect(mx - 4, my - 3, 3, 3); g.fillRect(mx + 3, my + 2, 2, 2);
+  }
   drawTiles(g, m, cam.x, cam.y, game.time);
 
   const list = [];
@@ -1065,8 +1221,13 @@ function renderWorld(cam) {
     if (!e.alive) continue;
     list.push({ y: e.y + 16, draw: () => {
       if (e.hurtT > 0 && Math.floor(game.time * 30) % 2) return;
-      const spr = e.type === 'slime' ? slimeSprite(Math.sin(e.anim * 7) > 0 ? 1 : 0) : koboldSprite(e.flip, e.throwT > 0 ? 1 : 0);
       const sx = Math.round(e.x - cam.x), sy = Math.round(e.y - cam.y);
+      if (e.type === 'bat') {
+        g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(sx + 5, sy + 15, 6, 1);
+        g.drawImage(batSprite(Math.floor(e.anim * 8) % 2), sx, sy + Math.round(Math.sin(e.anim * 4) * 2));
+        return;
+      }
+      const spr = e.type === 'slime' ? slimeSprite(Math.sin(e.anim * 7) > 0 ? 1 : 0) : koboldSprite(e.flip, e.throwT > 0 ? 1 : 0);
       shadow(sx, sy);
       g.drawImage(spr, sx, sy);
     } });
@@ -1092,6 +1253,40 @@ function renderWorld(cam) {
     grad.addColorStop(1, 'rgba(6,4,10,0.55)');
     g.fillStyle = grad;
     g.fillRect(0, 0, W, H);
+  }
+
+  if (m.theme === 'haunted' && game.state !== 'title') {
+    const L = leader();
+    const lx = L.x - cam.x + 8, ly = L.y - cam.y + 8;
+    const inside = m.tile(Math.floor((L.x + 8) / TILE), Math.floor((L.y + 12) / TILE)) === T.WOOD;
+    g.fillStyle = inside ? 'rgba(20,12,56,0.28)' : 'rgba(20,12,56,0.42)';
+    g.fillRect(0, 0, W, H);
+    const grad = g.createRadialGradient(lx, ly, 40, lx, ly, 160);
+    grad.addColorStop(0, 'rgba(10,6,30,0)');
+    grad.addColorStop(1, inside ? 'rgba(10,6,30,0.35)' : 'rgba(10,6,30,0.5)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, W, H);
+    // Kürbisse, Kerzen und Kessel leuchten
+    g.globalCompositeOperation = 'lighter';
+    for (const o of m.objects) {
+      if (!o.glow) continue;
+      const ox = o.x * TILE - cam.x + 8, oy = o.y * TILE - cam.y + 6;
+      if (ox < -30 || oy < -30 || ox > W + 30 || oy > H + 30) continue;
+      const fl = 18 + Math.sin(game.time * 7 + o.x) * 2;
+      const gl = g.createRadialGradient(ox, oy, 2, ox, oy, fl);
+      gl.addColorStop(0, o.type === 'cauldron' ? 'rgba(90,200,70,0.45)' : 'rgba(255,150,40,0.45)');
+      gl.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gl;
+      g.fillRect(ox - fl, oy - fl, fl * 2, fl * 2);
+    }
+    g.globalCompositeOperation = 'source-over';
+  }
+
+  if (game.state === 'play' && m.id === 'haunted') {
+    const h = game.haunt;
+    const npc = (id) => m.npcs.find((n) => n.id === id);
+    const open = { witch: !h.gate, bodo: h.gate && !h.front, zora: h.front && !h.count, plumps: h.chest && !h.lib, bit: h.lib && !h.candles, graf: h.candles && !h.king };
+    for (const [id, show] of Object.entries(open)) if (show && npc(id)) bubble(npc(id), cam);
   }
 
   if (game.state === 'play' && m.id === 'village') {
@@ -1213,6 +1408,12 @@ function render() {
     lines.forEach((l, i) => text(l, W / 2, H - 6 - lines.length * 9 + i * 9, { size: 6, align: 'center' }));
   }
 
+  const m = map();
+  if (m.labels) for (const lb of m.labels) text(lb.text, lb.x - cam.x, lb.y - cam.y, { size: 5, align: 'center', color: '#f8d848' });
+  if (m.id === 'haunted' && !game.haunt.candles) {
+    const r = m.riddles.candles;
+    text(String(game.haunt.target), r.x * TILE + 8 - cam.x, r.y * TILE - 10 - cam.y, { size: 7, align: 'center', color: '#f8d848' });
+  }
   for (const f of game.floats) text(f.text, f.x - cam.x, f.y - cam.y, { size: 6, align: 'center', color: f.color });
 
   const b = game.banners[0];
@@ -1242,6 +1443,7 @@ function renderTitle() {
 
 function renderEnd() {
   if (game.endT < 0.6) return;
+  if (game.endChapter === 3) return renderEnd3();
   const st = game.stats, c = game.maps.cave, cv = game.cave;
   const crystals = c.items.filter((i) => i.type === 'crystal' && i.taken).length;
   text('ENDE KAPITEL 2', W / 2, 18, { size: 12, align: 'center', color: '#f8d848' });
@@ -1250,6 +1452,25 @@ function renderEnd() {
     ['Gegner besiegt', `${c.enemies.filter((e) => !e.alive).length} / ${c.enemies.length}`],
     ['Kristalle', `${crystals} / ${c.totalCrystals}`],
     ['Geheimraum', cv.secret ? 'gefunden!' : 'nicht gefunden'],
+    ['Diamanten', String(game.diamonds)],
+    ['Level', String(st.level)],
+  ];
+  rows.forEach(([a, b], i) => {
+    text(a, 40, 56 + i * 11, { size: 6, color: '#b8c8e8' });
+    text(b, 200, 56 + i * 11, { size: 6, align: 'right', color: '#a8f070' });
+  });
+  text('Als Nächstes: Das Spukhaus am Buttenberg', W / 2, 120, { size: 6, align: 'center' });
+  if (game.endT > 1.5 && Math.floor(game.time * 2) % 2 === 0) text('A: Weiterspielen', W / 2, 138, { size: 6, align: 'center', color: '#a8f070' });
+}
+
+function renderEnd3() {
+  const st = game.stats, m = game.maps.haunted;
+  text('ENDE KAPITEL 3', W / 2, 18, { size: 12, align: 'center', color: '#f8d848' });
+  text('Das Spukhaus ist geschafft – Happy Halloween!', W / 2, 40, { size: 6, align: 'center' });
+  const rows = [
+    ['Bonbons', `${m.items.filter((i) => i.type === 'candy' && i.taken).length} / ${m.items.filter((i) => i.type === 'candy').length}`],
+    ['Fledermäuse', `${m.enemies.filter((e) => !e.alive).length} / ${m.enemies.length}`],
+    ['Kerzen-Code', `${game.haunt.target} = ${HW.toBits(game.haunt.target)}`],
     ['Diamanten', String(game.diamonds)],
     ['Level', String(st.level)],
   ];
