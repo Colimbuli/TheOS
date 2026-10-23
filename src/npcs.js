@@ -41,11 +41,22 @@ const STEP_NEEDS = { 0: 'shield', 1: 'shield', 2: 'strength', 4: 'dig', 6: 'invi
 export const ABILITY_NAME = { shield: 'Theos Schutzschild', strength: 'Felix\' Superstärke', dig: 'Arnes Grabkraft', invis: 'Friedrichs Tarnzauber' };
 
 export function questHint(game) {
+  if (game.mapId === 'valley' || game.mapId === 'under') return valleyHint(game);
   if (game.mapId === 'haunted') return hauntHint(game);
   if (game.mapId === 'cave' || game.step >= 7 && game.mapId !== 'village') return caveHint(game);
   const need = STEP_NEEDS[game.step];
   if (need && !game.owned[need]) return `Quest: Kauf ${ABILITY_NAME[need]}`;
   return STEP_HINT[game.step];
+}
+
+function valleyHint(game) {
+  const v = game.valley;
+  if (!v.sword) return 'Quest: Findet den Schatz in der Talmitte';
+  if (!v.key) return 'Quest: Holt den Schlüssel in der Unterwelt';
+  if (!v.lever) return 'Quest: Legt den Hebel um (über Höhle E)';
+  if (!v.door) return 'Quest: Öffnet die Felsentür (über Höhle C)';
+  if (!v.troll) return 'Quest: Besiegt den Troll!';
+  return 'Ziel: Durch das Gitter nach Norden';
 }
 
 function hauntHint(game) {
@@ -211,6 +222,11 @@ export function talkTo(n, game, fx) {
         'Theo: Wir wollen zum Drachen. Bitte lass uns durch!',
         'Graf Kürbis: Hohoho! Nur mit meinem Mondschlüssel. Den bekommt, wer meine drei Rätsel löst!',
       ], after() { fx.openRiddle('king'); } };
+
+    case 'trollfriend':
+      return { lines: game.valley.lever
+        ? ['Grummel: Das Gitter ist offen. Viel Glück beim Drachen – und grüßt ihn nicht von mir!']
+        : ['Grummel: Das Gitter öffnet nur der Hebel auf dem Felsvorsprung im Westen. Den erreicht ihr über Höhle E.'] };
 
     case 'troll':
       if (game.cave.troll) return { lines: ['Troll: Hä? Wo kommt ihr denn her?!'] };

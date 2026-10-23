@@ -5,6 +5,7 @@ import {
   drawHouse, drawFountain, drawStall, drawLever, drawSign, drawHouseSign, drawTorch, drawStatue,
   drawBlackboard, drawDesk, drawShelf, drawCounter, drawBarrel, drawPlant, drawWindow,
   drawPumpkin, drawGrave, drawCandle, drawWallBat, drawWallSpider, drawCauldron, drawDeadTree,
+  drawChest, drawSearchlight, drawSpitter, drawBrazier,
 } from './world.js';
 
 function addObj(b, o, draw, sortY) {
@@ -358,6 +359,186 @@ export function createHaunted() {
   map.checkpoints = [
     [2, 15, 29, 21, HAUNT_SPAWN.x, HAUNT_SPAWN.y, 1],
     [5, 13, 26, 13, 15 * TILE + 8, 15 * TILE, 1],
+  ];
+  return map;
+}
+
+// --- Kapitel 4: Das Tal der Trolle (nach Theos Karten) ------------------------------
+//
+// Oberwelt: Insel, durch Klippen in Zonen geteilt. Nur die Höhlen A–E verbinden sie (über die Unterwelt).
+//   Süden (Eingang, Höhle A) · Mitte (Schatz/Schwert, Suchscheinwerfer, Diamant, Höhlen B + D)
+//   Westen oben (Höhle E, Hebel fürs Ausgangsgitter) · Osten (Höhle C, Bombenwerfer, rissige Felsen,
+//   Felsentür mit Feuerspuck – braucht den Schlüssel) · Norden (Troll vor dem Ausgangsgitter)
+// Unterwelt: A → Schleime/Fledermäuse → B → Schwertwächter → Schlüsselraum · D → Fels (Felix) → E,
+//   Kristallkammer hinter Erdmauer · D → Erdmauer (Arne) → C mit Fels und Diamantenkammer
+
+export const VALLEY_SPAWN = { x: 15 * TILE + 8, y: 26 * TILE, dir: 1 };
+
+const HOLES_VALLEY = { A: [23, 24], B: [7, 19], C: [24, 16], D: [11, 14], E: [7, 8] };
+const HOLES_UNDER = { A: [26, 17], B: [6, 20], C: [24, 8], D: [12, 14], E: [19, 2] };
+// Ankunftspunkte (Pixel) neben dem jeweiligen Loch
+const ARRIVE_VALLEY = { A: [23, 25], B: [7, 20], C: [24, 17], D: [11, 15], E: [7, 9] };
+const ARRIVE_UNDER = { A: [25, 18], B: [7, 19], C: [24, 10], D: [13, 13], E: [18, 3] };
+
+export function createValley() {
+  const { map, b } = makeMap({ id: 'valley', w: 32, h: 30, fill: T.TREE, edge: T.TREE, theme: 'valley' });
+  b.rect(5, 2, 22, 27, T.GRASS);
+  const r = rng(11);
+  for (let i = 0; i < 60; i++) b.set(5 + ((r() * 22) | 0), 2 + ((r() * 27) | 0), T.FLOWER);
+  b.rect(2, 3, 3, 25, T.WATER); b.rect(27, 3, 3, 25, T.WATER);
+  b.rect(5, 2, 1, 1, T.TREE); b.rect(26, 2, 1, 1, T.TREE);
+
+  // Klippen
+  b.rect(13, 2, 14, 1, T.CLIFF);            // Nordrand der Troll-Arena
+  b.rect(13, 2, 1, 11, T.CLIFF);            // Westzone | Arena
+  b.rect(13, 8, 14, 1, T.CLIFF);            // Arena | Ostzone
+  b.rect(13, 9, 6, 4, T.CLIFF);             // Block zwischen Arena und Mitte
+  b.rect(5, 12, 8, 1, T.CLIFF);             // Westzone | Mitte
+  b.rect(19, 9, 1, 13, T.CLIFF);            // Mitte | Ostzone
+  b.rect(19, 18, 8, 1, T.CLIFF);            // Ostzone Süden
+  b.rect(20, 19, 7, 3, T.TREE);
+  b.rect(5, 22, 22, 1, T.CLIFF);            // Süden | Mitte
+
+  // Ausgang mit Gitter
+  b.rect(15, 0, 2, 2, T.PATH);
+  b.set(15, 2, T.BARS); b.set(16, 2, T.BARS);
+  b.rect(15, 3, 2, 5, T.PATH);
+  map.northExitCols = [15, 16];
+
+  // Felsentür (Schlüssel) mit Feuerspuck, rissige Felsen davor
+  b.set(21, 8, T.LOCKED);
+  b.rect(21, 9, 1, 3, T.PATH);
+  b.rect(20, 12, 7, 1, T.CRACK);
+  b.rect(21, 13, 1, 4, T.PATH); b.rect(22, 16, 2, 1, T.PATH);
+
+  // Wege
+  b.rect(15, 23, 2, 6, T.PATH); b.rect(17, 24, 6, 1, T.PATH);
+  b.rect(8, 19, 4, 1, T.PATH); b.rect(11, 15, 1, 4, T.PATH);
+  b.rect(7, 9, 1, 2, T.PATH); b.rect(8, 10, 3, 1, T.PATH); b.rect(10, 4, 1, 6, T.PATH);
+  b.set(15, 28, T.UP); b.set(16, 28, T.UP);   // zurück zum Spukhaus
+
+  // Höhleneingänge
+  map.holes = {};
+  for (const [k, [x, y]] of Object.entries(HOLES_VALLEY)) {
+    b.set(x, y, T.CAVEIN);
+    const [ax, ay] = ARRIVE_UNDER[k];
+    map.warps.push({ x, y, to: 'under', tx: ax * TILE, ty: ay * TILE, dir: 0, letter: k });
+  }
+  map.labels = Object.entries(HOLES_VALLEY).map(([k, [x, y]]) => ({ x: x * TILE + 8, y: y * TILE - 7, text: k }));
+
+  // Deko
+  for (const [x, y] of [[6, 24], [25, 26], [9, 27], [21, 27], [6, 3], [24, 4], [14, 20], [17, 14], [25, 10], [6, 16]]) b.set(x, y, T.BUSH);
+  for (const [x, y] of [[12, 25], [19, 23], [9, 6], [17, 16], [26, 14], [22, 6]]) b.set(x, y, T.ROCK);
+
+  // Objekte
+  map.chest = addObj(b, { type: 'chest', x: 6, y: 14, open: false }, drawChest); b.solid(6, 14);
+  map.searchlight = addObj(b, { type: 'searchlight', x: 13, y: 17, angle: 0, alarmT: 0 }, drawSearchlight); b.solid(13, 17);
+  map.lever = addObj(b, { type: 'lever', x: 11, y: 4, pulled: false }, drawLever); b.solid(11, 4);
+  map.isLever = (tx, ty) => tx === 11 && ty === 4;
+  map.spitters = [{ x: 21, y: 8, dir: 0, cd: 1, speed: 85, gap: 1.6, door: true }];
+  map.spitterObjs = map.spitters.map((sp) => addObj(b, { type: 'spitter', ...sp }, drawSpitter, 9 * TILE));
+  map.openGate = () => { b.set(15, 2, T.PATH); b.set(16, 2, T.PATH); map.northExit = true; map.lever.pulled = true; };
+
+  // Troll-Boss in der Arena
+  map.arena = { x0: 14 * TILE, y0: 3 * TILE, x1: 25 * TILE, y1: 7 * TILE };
+  map.enemySpawns = [
+    { type: 'guard', x: 7, y: 24 }, { type: 'guard', x: 25, y: 26 },
+    { type: 'bomber', x: 23, y: 14 },
+    { type: 'bat', x: 8, y: 6 }, { type: 'bat', x: 9, y: 27 },
+    { type: 'trollboss', x: 16, y: 4 },
+  ];
+
+  const item = (type, x, y, id) => map.items.push({ id, type, x: x * TILE + 2, y: y * TILE + 2, taken: false });
+  item('crystal', 16, 20, 'v1'); item('crystal', 6, 10, 'v2'); item('apple', 25, 9, 'v3'); item('bag', 26, 17, 'v4');
+  item('crystal', 9, 2, 'v5'); item('apple', 6, 21, 'v6');
+
+  map.hints = [
+    [5, 23, 26, 28, 'Das Tal der Trolle! Klippen versperren den Weg. Vielleicht führen die Höhlen weiter...'],
+    [5, 13, 18, 21, 'Ein Suchscheinwerfer! Wer im Licht entdeckt wird, löst Alarm aus. Friedrich?'],
+    [5, 2, 12, 11, 'Ein Hebel auf dem Felsvorsprung – er öffnet bestimmt das Ausgangsgitter!'],
+    [20, 13, 26, 17, 'Ein Bombenwerfer! Seine Bomben könnten die rissigen Felsen sprengen ... oder Theo wirft sie zurück.'],
+    [20, 9, 26, 11, 'Eine Felsentür, die Feuer spuckt! Theos Schild hilft – und ein Schlüssel.'],
+    [14, 3, 26, 7, 'Der Troll! Wirf seine Felsbrocken mit Theos Schild zurück, dann ist er kurz benommen!'],
+  ];
+  map.checkpoints = [
+    [5, 23, 26, 28, VALLEY_SPAWN.x, VALLEY_SPAWN.y, 1],
+    [5, 13, 18, 21, 7 * TILE, 20 * TILE, 1],
+    [5, 2, 12, 11, 7 * TILE, 9 * TILE, 0],
+    [20, 9, 26, 17, 24 * TILE, 17 * TILE, 1],
+    [14, 3, 26, 7, 21 * TILE, 7 * TILE, 1],
+  ];
+  return map;
+}
+
+export function createUnder() {
+  const { map, b } = makeMap({ id: 'under', w: 32, h: 24, fill: T.CWALL, edge: T.CWALL, theme: 'cave' });
+  const carve = (x, y, w, h) => b.rect(x, y, w, h, T.CFLOOR);
+  carve(20, 17, 8, 4);    // A
+  carve(11, 18, 9, 3);    // Gang A → B
+  carve(6, 16, 5, 5);     // B
+  carve(7, 9, 2, 7);      // Gang nach Norden (Schwertwächter)
+  carve(3, 3, 6, 6);      // Schlüsselraum
+  carve(9, 12, 3, 1);     // Durchgang zu D
+  carve(12, 9, 6, 6);     // D
+  carve(16, 6, 1, 3);     // Gang zu E
+  carve(13, 2, 7, 4);     // E
+  carve(9, 1, 3, 2);      // Kristallkammer
+  carve(18, 11, 3, 1);    // Gang zu C
+  carve(21, 9, 6, 6);     // C
+  carve(24, 8, 1, 1);     // Nische mit Aufgang C
+  carve(28, 10, 3, 3);    // Diamantenkammer
+  b.rect(14, 19, 2, 1, T.WATER);
+
+  b.set(12, 2, T.EWALL); b.set(19, 11, T.EWALL); b.set(27, 11, T.EWALL);
+  b.under(16, 6, T.CFLOOR); b.set(16, 6, T.BOULDER);     // Fels vor E (Felix)
+  b.under(24, 9, T.CFLOOR); b.set(24, 9, T.BOULDER);     // Fels vor Aufgang C (Felix)
+  for (const [x, y] of [[21, 20], [10, 16], [3, 8], [17, 14], [26, 14], [13, 5]]) b.set(x, y, T.MUSH);
+
+  for (const [k, [x, y]] of Object.entries(HOLES_UNDER)) {
+    b.set(x, y, T.UP);
+    const [ax, ay] = ARRIVE_VALLEY[k];
+    map.warps.push({ x, y, to: 'valley', tx: ax * TILE, ty: ay * TILE, dir: 0, letter: k });
+  }
+  map.labels = Object.entries(HOLES_UNDER).map(([k, [x, y]]) => ({ x: x * TILE + 8, y: y * TILE - 6, text: k }));
+
+  for (const [x, y] of [[22, 16], [26, 16], [8, 15], [4, 2], [14, 8], [16, 1], [23, 8], [12, 17]]) addObj(b, { type: 'torch', x, y }, drawTorch, 0);
+  for (const [x, y] of [[8, 3], [17, 9], [26, 9]]) { addObj(b, { type: 'brazier', x, y, glow: true }, drawBrazier); b.solid(x, y); }
+
+  // Feuerspucker in Schlüsselraum und Raum C
+  map.spitters = [
+    { x: 9, y: 5, dir: 2, cd: 0.5, speed: 75, gap: 1.8 },
+    { x: 20, y: 13, dir: 3, cd: 1.2, speed: 75, gap: 2 },
+  ];
+  map.spitterObjs = map.spitters.map((sp) => addObj(b, { type: 'spitter', ...sp }, drawSpitter, 0));
+
+  const item = (type, x, y, id) => map.items.push({ id, type, x: x * TILE + 2, y: y * TILE + 2, taken: false });
+  item('key', 4, 4, 'ukey');
+  item('crystal', 9, 1, 'u1'); item('crystal', 10, 2, 'u2'); item('crystal', 11, 1, 'u3');
+  item('crystal', 28, 10, 'u4'); item('crystal', 30, 12, 'u5'); item('apple', 29, 11, 'u6');
+  item('bag', 14, 12, 'u7'); item('apple', 6, 17, 'u8');
+
+  map.enemySpawns = [
+    { type: 'slime', x: 13, y: 19 }, { type: 'slime', x: 17, y: 18 }, { type: 'slime', x: 22, y: 19 },
+    { type: 'bat', x: 16, y: 20 }, { type: 'bat', x: 24, y: 18 },
+    { type: 'guard', x: 7, y: 13 }, { type: 'guard', x: 8, y: 10 },
+    { type: 'kobold', x: 25, y: 12 },
+  ];
+
+  map.hints = [
+    [20, 17, 27, 20, 'Die Unterwelt! Alle Höhlen der Insel sind hier unten verbunden.'],
+    [7, 9, 8, 15, 'Schwertwächter! Ihre Rüstung ist zu hart – nur ein Schwert hilft gegen sie.'],
+    [3, 3, 8, 8, 'Der Schlüsselraum! Vorsicht, Feuer! Theos Schild hält es ab.'],
+    [12, 9, 17, 14, 'Eine große Höhle. Ein Fels versperrt den Gang nach Norden, eine Erdmauer den nach Osten.'],
+    [21, 9, 26, 14, 'Höhle C. Ein Fels versperrt den Aufgang – und hinter der Erdmauer im Osten glitzert es!'],
+    [13, 2, 19, 5, 'Höhle E. Hinter der Erdmauer im Westen glitzert es ...'],
+  ];
+  map.checkpoints = [
+    [20, 17, 27, 20, 25 * TILE, 18 * TILE, 2],
+    [6, 16, 10, 20, 7 * TILE, 18 * TILE, 1],
+    [12, 9, 17, 14, 13 * TILE, 13 * TILE, 1],
+    [21, 9, 26, 14, 22 * TILE, 11 * TILE, 3],
+    [13, 2, 19, 5, 18 * TILE, 3 * TILE, 2],
+    [3, 3, 8, 8, 7 * TILE, 8 * TILE, 1],
   ];
   return map;
 }

@@ -406,3 +406,40 @@ export class PauseUI {
     text('A: wählen   B/Esc: zurück', W / 2, 150, { size: 5, align: 'center', color: '#8898c0' });
   }
 }
+
+// --- Kapitelauswahl ---------------------------------------------------------------
+
+export class ChapterUI {
+  constructor(game, fx, chapters, onPick) {
+    this.game = game; this.fx = fx; this.chapters = chapters; this.onPick = onPick;
+    this.sel = 0; this.nav = navigator(); this.closed = false;
+  }
+
+  update(input, dt, tap) {
+    const n = this.chapters.length + 1;
+    const d = this.nav(input, dt);
+    if (d) { this.sel = (this.sel + d + n) % n; this.fx.sfx.blip(); }
+    for (let i = 0; i < n; i++) if (hit(tap, 24, 30 + i * 22, 192, 20)) { this.sel = i; input.aPressed = true; }
+    if (input.bPressed || input.menuPressed) { this.closed = true; return; }
+    if (input.aPressed) {
+      this.closed = true;
+      if (this.sel < this.chapters.length) this.onPick(this.chapters[this.sel].n);
+    }
+  }
+
+  render(g, text) {
+    panel(g);
+    text('Kapitel wählen', 9, 7, { size: 6, color: '#f8d848' });
+    [...this.chapters, { name: 'Zurück' }].forEach((c, i) => {
+      const y = 30 + i * 22, sel = i === this.sel;
+      g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(24, y, 192, 20);
+      if (sel) { g.fillStyle = '#f8d848'; g.fillRect(24, y, 2, 20); }
+      if (c.n) {
+        text(`Kapitel ${c.n}`, 34, y + 3, { size: 5, color: '#f8d848' });
+        text(c.name, 34, y + 11, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
+      } else text(c.name, 34, y + 7, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
+    });
+    text('Startet mit allen Fähigkeiten bis dahin', W / 2, 142, { size: 5, align: 'center', color: '#a8b8d8' });
+    text('A: starten   B: zurück', W / 2, 151, { size: 5, align: 'center', color: '#8898c0' });
+  }
+}

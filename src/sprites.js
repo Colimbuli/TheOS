@@ -304,3 +304,59 @@ export function batSprite(frame = 0) {
     else { px('#2a1a34', 1, 5, 5, 3); px('#2a1a34', 10, 5, 5, 3); px('#2a1a34', 0, 7, 2, 2); px('#2a1a34', 14, 7, 2, 2); }
   });
 }
+
+// --- Tal der Trolle --------------------------------------------------------------
+
+// Schwertwächter: Ritter mit Helm, Schild und Schwert
+export function guardSprite(flip, frame) {
+  return canvasSprite(`guard${flip}${frame}`, 16, 18, (px) => {
+    const f = (x) => (flip ? 15 - x : x);
+    const P = (c, x, y, w = 1, h = 1) => { for (let i = 0; i < w; i++) px(c, f(x + i), y, 1, h); };
+    P('#1a1020', 4, 0, 8, 7); P('#8a8a9a', 5, 1, 6, 5); P('#c8c8d8', 5, 1, 2, 4); // Helm
+    P('#1a1020', 5, 3, 6, 1); P('#ff4040', 6, 3, 1, 1); P('#ff4040', 9, 3, 1, 1);  // Visier
+    P('#c83a3a', 7, 0, 2, 1);                                                       // Federbusch
+    P('#1a1020', 3, 7, 10, 7); P('#5a5a6a', 4, 8, 8, 5); P('#7a7a8a', 4, 8, 2, 5);   // Rüstung
+    P('#8a2a2a', 4, 11, 8, 1);
+    P('#1a1020', 0, 7, 4, 7); P('#3a58c8', 1, 8, 2, 5); P('#f0c838', 1, 10, 2, 1);   // Schild
+    const sy = frame ? 2 : 5;
+    P('#d8d8e8', 13, sy, 1, 8); P('#ffffff', 13, sy, 1, 2); P('#6a4a2a', 12, sy + 8, 3, 1); // Schwert
+    P('#1a1020', 4, 14, 3, 4); P('#1a1020', 9, 14, 3, 4);
+    P('#4a4a5a', 5, 14, 1, 3); P('#4a4a5a', 10, 14, 1, 3);
+  });
+}
+
+// Bombenwerfer: Kobold mit Bombe
+export function bomberSprite(flip, frame) {
+  return canvasSprite(`bomber${flip}${frame}`, 16, 16, (px) => {
+    const f = (x) => (flip ? 15 - x : x);
+    const P = (c, x, y, w = 1, h = 1) => { for (let i = 0; i < w; i++) px(c, f(x + i), y, 1, h); };
+    P('#3a2a1a', 5, 13, 2, 3); P('#3a2a1a', 9, 13, 2, 3);
+    P('#1a1020', 4, 8, 8, 6); P('#5a4a7a', 5, 9, 6, 4);
+    P('#1a1020', 3, 2, 10, 7); P('#c8a060', 4, 3, 8, 5); P('#e0c080', 4, 3, 3, 2);
+    P('#c8a060', 1, 4, 2, 2); P('#c8a060', 13, 4, 2, 2);
+    P('#1a1a1a', 5, 5, 2, 1); P('#1a1a1a', 9, 5, 2, 1);
+    P('#3a3a3a', 4, 1, 8, 2); // Mütze
+    if (frame) { P('#1a1a22', 11, 2, 4, 4); P('#5a5a6a', 11, 2, 1, 1); P('#f0c838', 14, 1, 1, 1); }
+    else { P('#1a1a22', 12, 9, 4, 4); P('#5a5a6a', 12, 9, 1, 1); P('#f0c838', 15, 8, 1, 1); }
+  });
+}
+
+export function bombSprite(blink) {
+  return canvasSprite(`bomb${blink}`, 10, 10, (px, ell) => {
+    ell(5, 6, 4, 4, (dx, dy, d) => (d > 0.7 ? '#0a0a10' : (dx < -0.2 && dy < -0.2) ? '#6a6a7a' : blink ? '#c83a3a' : '#2a2a34'));
+    px('#8a6a3a', 5, 0, 1, 3); px(blink ? '#ffffff' : '#ffc040', 5, 0, 1, 1);
+  });
+}
+
+export function rockSprite() {
+  return canvasSprite('rockball', 10, 10, (px, ell) => {
+    ell(5, 5, 4.6, 4.2, (dx, dy, d) => (d > 0.75 ? '#2e2620' : (dx + dy < -0.5) ? '#c8b49a' : (dx + dy > 0.5) ? '#6e5a48' : '#9c8670'));
+  });
+}
+
+export function swordIcon() {
+  return canvasSprite('swordicon', 12, 12, (px) => {
+    for (let i = 0; i < 8; i++) { px('#d8d8e8', 3 + i, 8 - i, 1, 1); px('#ffffff', 4 + i, 8 - i, 1, 1); }
+    px('#6a4a2a', 1, 8, 4, 2); px('#6a4a2a', 2, 7, 2, 4); px('#f0c838', 1, 10, 2, 2);
+  });
+}

@@ -23,9 +23,13 @@ export const T = {
   // Spukhaus
   RDOOR: 26,    // Rätseltür im Haus
   RGATE: 27,    // Rätsel-Gartentor
+  // Tal der Trolle
+  CLIFF: 28,    // Felsklippe
+  CAVEIN: 29,   // Höhleneingang (führt in die Unterwelt)
+  CRACK: 30,    // rissiger Fels – Bomben sprengen ihn
 };
 const SOLID = new Set([T.WATER, T.TREE, T.FENCE, T.BUSH, T.ROCK, T.GATE, T.BOULDER, T.DIGFENCE,
-  T.CWALL, T.EWALL, T.LOCKED, T.BARS, T.IWALL, T.RDOOR, T.RGATE]);
+  T.CWALL, T.EWALL, T.LOCKED, T.BARS, T.IWALL, T.RDOOR, T.RGATE, T.CLIFF, T.CRACK]);
 const FLOORISH = new Set([T.GRASS, T.FLOWER, T.CFLOOR, T.MUSH, T.WOOD]); // hierauf darf ein Fels geschoben werden
 
 // Generischer Kartenbaukasten. Liefert das Kartenobjekt mit Bau-Helfern (b.*).
@@ -132,7 +136,7 @@ function variant(world, tx, ty, t, frame) {
       return (f(tx, ty - 1) ? 1 : 0) | (f(tx + 1, ty) ? 2 : 0) | (f(tx, ty + 1) ? 4 : 0) | (f(tx - 1, ty) ? 8 : 0);
     }
     case T.CFLOOR: case T.MUSH: return hash(tx, ty) % 4;
-    case T.CWALL: case T.EWALL: case T.LOCKED: {
+    case T.CWALL: case T.EWALL: {
       // Wandfront, wenn darunter begehbarer Boden liegt
       const below = tl(tx, ty + 1);
       const face = !SOLID.has(below) || below === T.EWALL || below === T.LOCKED || below === T.BARS ? 1 : 0;
@@ -144,6 +148,11 @@ function variant(world, tx, ty, t, frame) {
       return (r(tx, ty - 1) ? 0 : 1) | (r(tx + 1, ty) ? 0 : 2) | (r(tx, ty + 1) ? 0 : 4) | (r(tx - 1, ty) ? 0 : 8);
     }
     case T.BOULDER: return world.theme === 'cave' ? 1 : world.theme === 'haunted' ? 2 : 0;
+    case T.BARS: case T.LOCKED: case T.CRACK: return world.theme === 'valley' ? 1 : 0;
+    case T.CLIFF: {
+      const isC = (x, y) => { const n = tl(x, y); return n === T.CLIFF || n === T.LOCKED || n === T.BARS || n === T.CAVEIN || n === T.TREE; };
+      return (isC(tx, ty - 1) ? 0 : 1) | (isC(tx, ty + 1) ? 0 : 2) | (isC(tx - 1, ty) ? 0 : 4) | (isC(tx + 1, ty) ? 0 : 8) | (hash(tx, ty) % 3) << 4;
+    }
     case T.UP: case T.DOWN: return frame;
     default: return 0;
   }
@@ -472,8 +481,8 @@ const PAINT = {
     px(g, '#5a3a20', 0, 14, 16, 2);
   },
 
-  [T.LOCKED](g) {
-    px(g, CAVE.rockD, 0, 0, 16, 16);
+  [T.LOCKED](g, v) {
+    if (v === 1) { PAINT[T.CLIFF](g, 0); } else px(g, CAVE.rockD, 0, 0, 16, 16);
     px(g, '#2a1a10', 2, 1, 12, 15);
     px(g, '#8a5a2c', 3, 2, 10, 14);
     px(g, '#6a4220', 6, 2, 1, 14); px(g, '#6a4220', 9, 2, 1, 14);
@@ -482,8 +491,8 @@ const PAINT = {
     px(g, '#2a1a08', 7, 8, 2, 1); px(g, '#2a1a08', 7, 9, 2, 2);
   },
 
-  [T.BARS](g) {
-    PAINT[T.CFLOOR](g, 0);
+  [T.BARS](g, v) {
+    if (v) paintGrass(g, 0); else PAINT[T.CFLOOR](g, 0);
     px(g, 'rgba(10,8,12,0.75)', 0, 0, 16, 16);
     for (let x = 1; x < 16; x += 4) { px(g, '#5a5a66', x, 0, 2, 16); px(g, '#a8a8b8', x, 0, 1, 16); }
     px(g, '#4a4a56', 0, 3, 16, 2); px(g, '#8a8a98', 0, 3, 16, 1);
@@ -569,6 +578,53 @@ const PAINT = {
     }
     px(g, '#2a2a34', 0, 5, 16, 2); px(g, '#2a2a34', 0, 11, 16, 2);
     px(g, '#f0c838', 6, 6, 4, 5); px(g, '#2a1408', 7, 7, 2, 1); px(g, '#2a1408', 8, 8, 1, 1); px(g, '#2a1408', 7, 9, 1, 1);
+  },
+
+  // --- Tal der Trolle ---
+  [T.CLIFF](g, v) {
+    // Felsklippe: oben Grasrand, unten sichtbare Felswand mit runden Ecken
+    const top = v & 1, bottom = v & 2, left = v & 4, right = v & 8, seed = v >> 4;
+    px(g, '#6a5644', 0, 0, 16, 16);
+    const r = rng(700 + seed * 11);
+    for (let i = 0; i < 6; i++) { const x = (r() * 14) | 0, y = (r() * 14) | 0; px(g, '#5a4836', x, y, 3, 1); px(g, '#8a7458', x, y - 1, 2, 1); }
+    for (let y = 0; y < 16; y += 5) px(g, '#4e3e2e', 0, y + (seed % 2) * 2, 16, 1);
+    if (top) {
+      paintGrass(g, 1);
+      px(g, '#6a5644', 0, 6, 16, 10);
+      for (let x = 0; x < 16; x++) {
+        const h = 6 + Math.round(Math.sin(x * 0.9 + seed) * 1.2);
+        px(g, '#3a6a2c', x, h, 1, 1); px(g, '#8ac060', x, h - 1, 1, 1);
+      }
+      for (let i = 0; i < 4; i++) { const x = (r() * 14) | 0; px(g, '#8a7458', x, 9 + ((r() * 5) | 0), 3, 1); }
+    }
+    if (bottom) {
+      px(g, '#3e3024', 0, 13, 16, 2);
+      px(g, 'rgba(0,0,0,0.3)', 0, 15, 16, 1);
+    }
+    if (left) { px(g, '#4e3e2e', 0, 0, 1, 16); px(g, '#8a7458', 1, top ? 7 : 0, 1, top ? 9 : 16); }
+    if (right) { px(g, '#3e3024', 15, 0, 1, 16); }
+  },
+
+  [T.CAVEIN](g) {
+    paintGrass(g, 2);
+    px(g, 'rgba(0,0,0,0.25)', 1, 12, 14, 3);
+    blob(g, 8, 9, 7.6, 6.6, (d, dx, dy) => (d > 0.78 ? (dy < 0 ? '#9a8670' : '#6e5a48') : null) || '#1a120c');
+    blob(g, 8, 10, 5.2, 4.4, (d, dx, dy) => (dy < -0.2 ? '#050302' : '#120c08'));
+    px(g, '#c8b49a', 4, 3, 3, 1); px(g, '#c8b49a', 10, 3, 2, 1);
+  },
+
+  [T.CRACK](g, v) {
+    if (v) paintGrass(g, 3); else PAINT[T.CFLOOR](g, 1);
+    px(g, 'rgba(0,0,0,0.25)', 1, 13, 14, 3);
+    blob(g, 8, 8.5, 7.6, 7, (d, dx, dy) => {
+      if (d > 0.84) return '#2e2620';
+      if (dx + dy < -0.7) return '#b4a48e';
+      if (dx + dy > 0.5) return '#5e4e40';
+      return '#8a7866';
+    });
+    // Risse
+    px(g, '#1a120c', 7, 2, 1, 4); px(g, '#1a120c', 8, 5, 1, 3); px(g, '#1a120c', 6, 8, 2, 1); px(g, '#1a120c', 9, 8, 3, 1);
+    px(g, '#1a120c', 5, 9, 1, 3); px(g, '#1a120c', 11, 9, 1, 2); px(g, '#1a120c', 3, 6, 3, 1);
   },
 
   [T.RUG](g, m) {
@@ -997,4 +1053,55 @@ export function drawDeadTree(g, o, cx, cy) {
   px(g, '#2a1a12', X + 2, Y - 4, 5, 2); px(g, '#2a1a12', X + 1, Y - 8, 2, 5);
   px(g, '#2a1a12', X + 10, Y - 2, 4, 2); px(g, '#2a1a12', X + 13, Y - 6, 2, 5);
   px(g, '#2a1a12', X + 8, Y - 12, 2, 7); px(g, '#2a1a12', X + 5, Y - 14, 3, 2);
+}
+
+// --- Tal der Trolle: Objekte -----------------------------------------------------------
+
+export function drawChest(g, o, cx, cy) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  px(g, 'rgba(0,0,0,0.3)', X + 1, Y + 13, 14, 3);
+  if (o.open) {
+    px(g, '#2a1408', X + 1, Y + 1, 14, 5); px(g, '#7a4422', X + 2, Y + 2, 12, 3);
+    px(g, '#2a1408', X + 1, Y + 6, 14, 9); px(g, '#1a0c06', X + 2, Y + 7, 12, 3); px(g, '#7a4422', X + 2, Y + 10, 12, 4);
+    px(g, '#f0c838', X + 2, Y + 6, 12, 1);
+    return;
+  }
+  px(g, '#2a1408', X + 1, Y + 3, 14, 12);
+  px(g, '#9a5a2e', X + 2, Y + 4, 12, 10); px(g, '#c8803e', X + 2, Y + 4, 12, 2);
+  px(g, '#f0c838', X + 2, Y + 8, 12, 1); px(g, '#f0c838', X + 4, Y + 4, 1, 10); px(g, '#f0c838', X + 11, Y + 4, 1, 10);
+  px(g, '#f0c838', X + 7, Y + 7, 2, 3); px(g, '#2a1408', X + 7, Y + 8, 2, 1);
+}
+
+// Suchscheinwerfer-Turm (der Lichtkegel wird in main.js gezeichnet)
+export function drawSearchlight(g, o, cx, cy, t) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  px(g, 'rgba(0,0,0,0.3)', X, Y + 13, 16, 3);
+  px(g, '#2a2420', X + 2, Y - 6, 12, 20);
+  px(g, '#8a8078', X + 3, Y - 5, 10, 18); px(g, '#a8a098', X + 3, Y - 5, 3, 18);
+  for (let y = Y - 3; y < Y + 12; y += 4) px(g, '#6e665e', X + 3, y, 10, 1);
+  const alarm = o.alarmT > 0 && Math.floor(t * 8) % 2;
+  px(g, '#2a2420', X + 1, Y - 11, 14, 6);
+  px(g, alarm ? '#ff4040' : '#fff6b0', X + 3, Y - 10, 10, 4);
+  px(g, '#ffffff', X + 5, Y - 9, 3, 1);
+}
+
+// Feuerspucker: Drachenkopf an der Wand
+export function drawSpitter(g, o, cx, cy, t) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  const glow = Math.floor(t * 4 + o.x) % 2 ? '#ffb030' : '#ff7a20';
+  px(g, '#2e2824', X + 3, Y + 3, 10, 10);
+  px(g, '#8a8078', X + 4, Y + 4, 8, 8); px(g, '#a8a098', X + 4, Y + 4, 8, 2);
+  px(g, '#2e2824', X + 5, Y + 6, 2, 2); px(g, glow, X + 5, Y + 6, 1, 1);
+  px(g, '#2e2824', X + 9, Y + 6, 2, 2); px(g, glow, X + 10, Y + 6, 1, 1);
+  const [dx, dy] = [[0, 1], [0, -1], [-1, 0], [1, 0]][o.dir];
+  px(g, '#1a1008', X + 6 + dx * 4, Y + 9 + dy * 4, 4, 3); px(g, glow, X + 7 + dx * 4, Y + 10 + dy * 4, 2, 1);
+}
+
+// Feuerschale (Licht in der Unterwelt)
+export function drawBrazier(g, o, cx, cy, t) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  const f = Math.floor(t * 8 + o.x) % 2;
+  px(g, 'rgba(0,0,0,0.3)', X + 3, Y + 13, 10, 3);
+  px(g, '#2a2a34', X + 4, Y + 10, 8, 4); px(g, '#5a5a6a', X + 3, Y + 8, 10, 3); px(g, '#8a8a9a', X + 3, Y + 8, 10, 1);
+  px(g, '#ff6a20', X + 4, Y + 3 - f, 8, 6); px(g, '#ffc040', X + 6, Y + 4 - f, 4, 4); px(g, '#fff6b0', X + 7, Y + 5 - f, 2, 2);
 }

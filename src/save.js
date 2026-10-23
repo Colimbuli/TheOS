@@ -14,7 +14,7 @@ export function snapshot(game) {
     party: game.party.map((m) => m.id),
     stats: game.stats, step: game.step, owned: game.owned,
     diamonds: game.diamonds, ammo: game.ammo, hasCloak: game.hasCloak,
-    cave: game.cave, haunt: game.haunt, quizStats: game.quizStats, quizIntro: game.quizIntro,
+    cave: game.cave, haunt: game.haunt, valley: game.valley, quizStats: game.quizStats, quizIntro: game.quizIntro,
     seenHints: game.seenHints, checkpoint: game.checkpoint,
     bushes: game.bushes, treasures: game.treasures, kills: game.kills,
   };
@@ -37,22 +37,24 @@ export const saveSlot = (game, n) => write(SLOT(n), snapshot(game));
 export const loadSlot = (n) => read(SLOT(n));
 
 // --- Speichercode -----------------------------------------------------------------
-// 16 Zeichen, z. B. "K7QX-M2PA-9ZRB-4HTD". Enthält Fortschritt, Fähigkeiten, Diamanten, Level.
+// 20 Zeichen, z. B. "K7QX-M2PA-9ZRB-4HTD-AB2C" (ältere Codes mit 16 Zeichen gelten weiter).
+// Enthält Fortschritt, Fähigkeiten, Diamanten, Level.
 // Man startet am Anfang der jeweiligen Karte; Gegenstände in Höhle/Spukhaus liegen wieder da.
 
 const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // ohne 0/O und 1/I/L-Verwechslung
-const OWN = ['shield', 'strength', 'dig', 'invis', 'sling', 'shovel', 'shield2'];
+const OWN = ['shield', 'strength', 'dig', 'invis', 'sling', 'shovel', 'shield2', 'sword'];
+const VALLEY = ['sword', 'key', 'lever', 'door', 'troll', 'done'];
 const CAVE = ['dug', 'boulder', 'key', 'door', 'statue', 'troll', 'lever', 'secret', 'done'];
 const HAUNT = ['gate', 'front', 'count', 'chest', 'lib', 'candles', 'king', 'door6', 'done'];
-const MAPS = ['village', 'cave', 'haunted'];
+const MAPS = ['village', 'cave', 'haunted', 'valley', 'under'];
 
-// Feldliste: [Bitbreite, Wert lesen, Wert schreiben]
-function fields() {
+// Feldliste: [Bitbreite, Wert lesen]. v = 1 (alt, 16 Zeichen) oder 2 (neu, 20 Zeichen)
+function fields(v = 2) {
   const flags = (names, obj) => names.reduce((v, n, i) => v | ((obj && obj[n] ? 1 : 0) << i), 0);
   return [
     [3, (s) => s.step],
     [1, (s) => (s.hasCloak ? 1 : 0)],
-    [7, (s) => flags(OWN, s.owned)],
+    [v === 1 ? 7 : 8, (s) => flags(OWN, s.owned)],
     [2, (s) => Math.min(3, (s.owned && s.owned.heart) || 0)],
     [10, (s) => Math.min(1023, s.diamonds)],
     [8, (s) => Math.min(255, s.ammo)],
@@ -61,30 +63,35 @@ function fields() {
     [9, (s) => flags(CAVE, s.cave)],
     [9, (s) => flags(HAUNT, s.haunt)],
     [5, (s) => (s.haunt && s.haunt.target) || 5],
-    [2, (s) => Math.max(0, MAPS.indexOf(s.mapId === 'school' || s.mapId === 'shop' ? 'village' : s.mapId))],
+    ...(v === 1 ? [] : [[6, (s) => flags(VALLEY, s.valley)]]),
+    [v === 1 ? 2 : 3, (s) => Math.max(0, MAPS.indexOf(s.mapId === 'school' || s.mapId === 'shop' ? 'village' : s.mapId))],
   ];
 }
 
+const LEN = { 1: 16, 2: 20 };
+const BYTES = { 1: 10, 2: 12 };
+
 // FNV-1a über alle Bytes – erkennt Tippfehler zuverlässig
-function checksum(n) {
+function checksum(n, v = 2) {
   let h = 0x811c9dc5;
-  for (let i = 0; i < 10; i++) { h ^= Number((n >> BigInt(i * 8)) & 255n); h = Math.imul(h, 0x01000193) >>> 0; }
+  for (let i = 0; i < BYTES[v]; i++) { h ^= Number((n >> BigInt(i * 8)) & 255n); h = Math.imul(h, 0x01000193) >>> 0; }
   return (h ^ (h >>> 8) ^ (h >>> 16) ^ (h >>> 24)) & 255;
 }
 
 export function encodeCode(snap) {
   let n = 0n;
-  for (const [bits, get] of fields()) n = (n << BigInt(bits)) | BigInt(get(snap) & ((1 << bits) - 1));
-  n = (n << 8n) | BigInt(checksum(n));
+  for (const [bits, get] of fields(2)) n = (n << BigInt(bits)) | BigInt(get(snap) & ((1 << bits) - 1));
+  n = (n << 8n) | BigInt(checksum(n, 2));
   let s = '';
-  for (let i = 0; i < 16; i++) { s = ABC[Number(n & 31n)] + s; n >>= 5n; }
+  for (let i = 0; i < LEN[2]; i++) { s = ABC[Number(n & 31n)] + s; n >>= 5n; }
   return s.match(/.{4}/g).join('-');
 }
 
 // Liefert die Rohwerte oder null, wenn der Code ungültig ist
 export function decodeCode(code) {
   const clean = String(code).toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/0/g, 'O').replace(/1/g, 'I');
-  if (clean.length !== 16) return null;
+  const v = clean.length === 16 ? 1 : clean.length === 20 ? 2 : 0;
+  if (!v) return null;
   let n = 0n;
   for (const ch of clean) {
     const i = ABC.indexOf(ch);
@@ -93,17 +100,18 @@ export function decodeCode(code) {
   }
   const sum = Number(n & 255n);
   n >>= 8n;
-  if (checksum(n) !== sum) return null;
-  const f = fields();
+  if (checksum(n, v) !== sum) return null;
+  const f = fields(v);
   const vals = [];
   for (let i = f.length - 1; i >= 0; i--) { const bits = f[i][0]; vals.unshift(Number(n & BigInt((1 << bits) - 1))); n >>= BigInt(bits); }
-  const [step, cloak, own, hearts, diamonds, ammo, level, xp, cave, haunt, target, map] = vals;
+  if (v === 1) vals.splice(11, 0, 0); // alte Codes: kein Tal-Fortschritt
+  const [step, cloak, own, hearts, diamonds, ammo, level, xp, cave, haunt, target, valley, map] = vals;
   const unpack = (names, v) => Object.fromEntries(names.map((nm, i) => [nm, !!(v >> i & 1)]));
   const owned = Object.fromEntries(OWN.filter((_, i) => own >> i & 1).map((k) => [k, true]));
   if (hearts) owned.heart = hearts;
   return {
     step, hasCloak: !!cloak, owned, diamonds, ammo, level: Math.max(1, level), xp,
-    cave: unpack(CAVE, cave), haunt: { ...unpack(HAUNT, haunt), target: Math.max(5, target) },
+    cave: unpack(CAVE, cave), haunt: { ...unpack(HAUNT, haunt), target: Math.max(5, target) }, valley: unpack(VALLEY, valley),
     mapId: MAPS[map] || 'village',
   };
 }

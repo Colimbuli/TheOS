@@ -7,11 +7,11 @@
 import { initInput, pollInput, input, isTouch } from './input.js';
 import { sfx, unlockAudio } from './audio.js';
 import { drawTiles, T, TILE, COL, drawDiamond } from './world.js';
-import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES } from './maps.js';
-import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite } from './sprites.js';
+import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES, createValley, createUnder, VALLEY_SPAWN } from './maps.js';
+import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite, guardSprite, bomberSprite, bombSprite, rockSprite } from './sprites.js';
 import { createNPCs, talkTo, arneDoor, LEVER_DIALOG, HEROES, questHint, ABILITY_NAME } from './npcs.js';
 import { Dialog } from './dialog.js';
-import { QuizUI, ShopUI, RiddleUI, PauseUI } from './ui.js';
+import { QuizUI, ShopUI, RiddleUI, PauseUI, ChapterUI } from './ui.js';
 import * as HW from './halloween.js';
 import { saveGame, loadGame, saveSlot, loadSlot, encodeCode, decodeCode, snapshot } from './save.js';
 
@@ -41,7 +41,7 @@ const leader = () => game.party[0];
 const map = () => game.maps[game.mapId];
 
 function newGame() {
-  const maps = { village: createVillage(), school: createSchool(), shop: createShop(), cave: createCave(), haunted: createHaunted() };
+  const maps = { village: createVillage(), school: createSchool(), shop: createShop(), cave: createCave(), haunted: createHaunted(), valley: createValley(), under: createUnder() };
   maps.village.npcs = createNPCs();
   game = {
     state: 'title', time: 0, titleT: 0, endT: 0, menu: 0,
@@ -54,6 +54,7 @@ function newGame() {
     quizStats: { de: { r: 0, n: 0 }, en: { r: 0, n: 0 }, geo: { r: 0, n: 0 }, ma: { r: 0, n: 0 } },
     haunt: { gate: false, front: false, count: false, chest: false, lib: false, candles: false, king: false, door6: false,
       done: false, target: 5 + Math.floor(Math.random() * 27), taken: [] },
+    valley: { sword: false, key: false, lever: false, door: false, troll: false, done: false, edits: [], taken: [] },
     quizIntro: false, seenHints: {},
     challenge: { active: false, blocked: 0, timer: 0 },
     cloak: { x: 6 * TILE + 3, y: 19 * TILE + 2, taken: false },
@@ -64,6 +65,8 @@ function newGame() {
   };
   spawnEnemies(maps.cave);
   spawnEnemies(maps.haunted);
+  spawnEnemies(maps.valley);
+  spawnEnemies(maps.under);
 }
 
 // Gespeicherten Stand auf frisch aufgebaute Karten anwenden
@@ -98,13 +101,19 @@ function applySave(d) {
     if (h.door6) hm.setTile(20, 3, T.WOOD);
     for (const it of hm.items) if (h.taken.includes(it.id)) it.taken = true;
   }
+  if (d.valley) {
+    Object.assign(game.valley, d.valley);
+    applyValley();
+  }
   game.mapId = d.mapId;
   game.state = 'play';
 }
 
+const HP = { slime: 2, kobold: 3, bat: 1, guard: 3, bomber: 2, trollboss: 6 };
+
 function spawnEnemies(m) {
   m.enemies = (m.enemySpawns || []).map((s, i) => ({
-    id: i, type: s.type, x: s.x * TILE, y: s.y * TILE, hp: { slime: 2, kobold: 3, bat: 1 }[s.type],
+    id: i, type: s.type, x: s.x * TILE, y: s.y * TILE, hp: HP[s.type], home: { x: s.x * TILE, y: s.y * TILE }, stunT: 0,
     cd: 1 + Math.random() * 1.5, hurtT: 0, alive: true, anim: Math.random() * 3, flip: false, throwT: 0,
   }));
 }
@@ -219,6 +228,7 @@ function goTo(mapId, x, y, dir) {
   game.banners = game.banners.slice(-1);
   if (mapId === 'cave') game.checkpoint = { map: 'cave', ...CAVE_SPAWN };
   if (mapId === 'haunted') game.checkpoint = { map: 'haunted', ...HAUNT_SPAWN };
+  if (mapId === 'valley' || mapId === 'under') game.checkpoint = { map: mapId, x, y, dir };
   save();
 }
 
@@ -312,9 +322,12 @@ function update(dt) {
       if (game.endChapter === 2) {
         goTo('haunted', HAUNT_SPAWN.x, HAUNT_SPAWN.y, HAUNT_SPAWN.dir);
         fx.banner('KAPITEL 3', 'Das Spukhaus am Buttenberg', '#ffb040');
+      } else if (game.endChapter === 3) {
+        goTo('valley', VALLEY_SPAWN.x, VALLEY_SPAWN.y, VALLEY_SPAWN.dir);
+        fx.banner('KAPITEL 4', 'Das Tal der Trolle', '#ffb040');
       } else {
         const L = leader();
-        L.x = 24 * TILE; L.y = 8 * TILE; L.dir = 0;
+        L.x = 16 * TILE; L.y = 5 * TILE; L.dir = 0;
         regroup();
         save();
       }
@@ -354,6 +367,8 @@ function update(dt) {
   updateProjectiles(dt);
   updateStatue(dt);
   updateTroll();
+  updateSpitters(dt);
+  updateSearchlight(dt);
   checkPickups();
   checkKonrad();
   checkAreas();
@@ -366,6 +381,7 @@ function update(dt) {
 function titleItems() {
   const items = [];
   if (loadGame()) items.push({ id: 'continue', label: 'Weiterspielen' });
+  items.push({ id: 'chapters', label: 'Kapitel wählen' });
   items.push({ id: 'load', label: 'Laden / Code' });
   items.push({ id: 'new', label: 'Neues Spiel' });
   return items;
@@ -407,7 +423,7 @@ function fromCode(c) {
   const maxHearts = Math.min(12, 2 + c.level + (c.owned.heart || 0));
   const pos = {
     village: c.step >= 7 ? { x: 15 * TILE + 8, y: 3 * TILE, dir: 0 } : { x: 10 * TILE, y: 8 * TILE, dir: 0 },
-    cave: CAVE_SPAWN, haunted: HAUNT_SPAWN,
+    cave: CAVE_SPAWN, haunted: HAUNT_SPAWN, valley: VALLEY_SPAWN, under: { x: 25 * TILE, y: 18 * TILE, dir: 2 },
   }[c.mapId];
   const dugCells = [];
   if (c.cave.dug) dugCells.push('15,17');
@@ -417,14 +433,45 @@ function fromCode(c) {
     stats: { level: c.level, xp: c.xp, maxHearts, hearts: maxHearts },
     step: c.step, owned: c.owned, diamonds: c.diamonds, ammo: c.ammo, hasCloak: c.hasCloak,
     cave: { ...c.cave, taken: [], dugCells }, haunt: { ...c.haunt, taken: [] },
+    valley: { ...(c.valley || {}), edits: [], taken: [] },
     quizIntro: true, seenHints: {},
   };
 }
 
 function openPause(opts) { game.ui = new PauseUI(game, fx, PAUSE_API, opts); }
 
+// --- Kapitelauswahl ------------------------------------------------------------------
+
+export const CHAPTERS = [
+  { n: 1, name: 'Die Gefährten' },
+  { n: 2, name: 'Die Höhle im Buttenberg' },
+  { n: 3, name: 'Das Spukhaus' },
+  { n: 4, name: 'Das Tal der Trolle' },
+];
+
+// Startet ein Kapitel mit allem, was man bis dahin normalerweise hätte
+function startChapter(n) {
+  if (n === 1) { newGame(); startFromTitle('new'); return; }
+  const allBasic = { shield: true, strength: true, dig: true, invis: true, sling: true, shovel: true };
+  const caveDone = { dug: true, boulder: true, key: true, door: true, statue: true, troll: true, lever: true, secret: false, done: true };
+  const hauntDone = { gate: true, front: true, count: true, chest: true, lib: true, candles: true, king: true, door6: true, done: true, target: 19 };
+  const preset = {
+    2: { mapId: 'cave', level: 4, diamonds: 20, cave: {}, haunt: { target: 19 } },
+    3: { mapId: 'haunted', level: 6, diamonds: 25, cave: caveDone, haunt: { target: 5 + Math.floor(Math.random() * 27) } },
+    4: { mapId: 'valley', level: 7, diamonds: 30, cave: caveDone, haunt: hauntDone },
+  }[n];
+  newGame();
+  applySave(fromCode({ step: 7, hasCloak: true, owned: allBasic, ammo: 30, xp: 0, valley: {}, ...preset }));
+  game.titleCache = null;
+  sfx.start();
+  const c = CHAPTERS[n - 1];
+  fx.banner(`KAPITEL ${n}`, c.name, '#ffb040');
+  save();
+}
+
 function startFromTitle(id) {
   if (id === 'load') { sfx.confirm(); openPause({ fromTitle: true }); return; }
+  if (id === 'chapters') { sfx.confirm(); game.ui = new ChapterUI(game, fx, CHAPTERS, startChapter); return; }
   sfx.start();
   if (id === 'continue') {
     applySave(loadGame());
@@ -506,6 +553,7 @@ function interact() {
   }
 
   if (m.isLever && m.isLever(tx, ty)) { pullLever(); return; }
+  if (m.chest && m.chest.x === tx && m.chest.y === ty) { openChest(); return; }
   if (m.id === 'haunted') {
     const c = m.candles.find((k) => k.x === tx && k.y === ty);
     if (c) { toggleCandle(c); return; }
@@ -526,7 +574,15 @@ function interact() {
   if (t === T.GATE) dialog.open(['Das Tor zum Buttenberg ist fest verschlossen.', 'Der Hebel dafür ist gleich daneben – direkt vor Konrads Nase.']);
   else if (t === T.BOULDER) dialog.open(['Ein riesiger Felsbrocken. Dafür braucht man Felix\' Superstärke!']);
   else if (t === T.DIG || t === T.EWALL) dialog.open(['Lockere Erde. Hier könnte Arne graben...']);
-  else if (t === T.LOCKED && m.id === 'haunted') {
+  else if (t === T.LOCKED && m.id === 'valley') {
+    if (game.valley.key) {
+      editTile(m, tx, ty, T.PATH);
+      game.valley.door = true;
+      sfx.door();
+      fx.toast('Der Schlüssel passt! Die Felsentür ist offen.', 3);
+      save();
+    } else dialog.open(['Eine schwere Felsentür mit Schlüsselloch. Der Schlüssel liegt bestimmt irgendwo in der Unterwelt.']);
+  } else if (t === T.LOCKED && m.id === 'haunted') {
     if (game.haunt.king) {
       m.setTile(tx, ty, T.WOOD);
       game.haunt.door6 = true;
@@ -547,6 +603,15 @@ function interact() {
 function pullLever() {
   const m = map();
   if (m.lever.pulled) { dialog.open(['Der Hebel ist schon umgelegt.']); return; }
+  if (m.id === 'valley') {
+    m.openGate();
+    game.valley.lever = true;
+    sfx.door();
+    fx.banner('DAS GITTER IST OFFEN', 'Jetzt nur noch am Troll vorbei ...', '#a8f070');
+    fx.gainXP(10);
+    save();
+    return;
+  }
   if (m.id === 'cave') {
     m.lever.pulled = true;
     m.setTile(2, 9, T.CFLOOR);
@@ -587,6 +652,7 @@ function useAbility() {
   const t = m.tile(tx, ty);
   switch (L.id) {
     case 'theo':
+      if (o.sword && enemyInFront(L)) return swordSwing(L);
       if (!o.shield) return needBuy('shield');
       if (game.shieldCD > 0) return;
       game.shieldT = o.shield2 ? 1.5 : 0.8;
@@ -652,6 +718,11 @@ function felixStrength(L, tx, ty, t) {
       float('Hau-Ruck!', L.x + 8, L.y - 6, '#ffffff');
       if (m.id === 'cave' && !game.cave.boulder) { game.cave.boulder = true; fx.gainXP(5); save(); }
       if (m.id === 'haunted' && !game.haunt.chest) { game.haunt.chest = true; fx.gainXP(5); save(); }
+      if (m.id === 'valley' || m.id === 'under') {
+        game.valley.edits.push([m.id, tx, ty, m.tile(tx, ty)], [m.id, tx + dx, ty + dy, T.BOULDER]);
+        fx.gainXP(3);
+        save();
+      }
     } else { sfx.bump(); float('Klemmt!', L.x + 8, L.y - 6, '#ffb0b0'); }
     return;
   }
@@ -682,6 +753,12 @@ function arneDig(L, tx, ty, t) {
     burst(tx * TILE + 8, ty * TILE + 12, DIRT, 14);
     float('Tunnel!', tx * TILE + 8, ty * TILE - 6, '#ffffff');
     fx.gainXP(5);
+  } else if (t === T.EWALL && m.id !== 'cave') {
+    editTile(m, tx, ty, T.CFLOOR);
+    burst(tx * TILE + 8, ty * TILE + 10, DIRT, 16);
+    float('Durchgebuddelt!', tx * TILE + 8, ty * TILE - 6, '#ffffff');
+    fx.gainXP(4);
+    save();
   } else if (t === T.EWALL) {
     m.setTile(tx, ty, T.CFLOOR);
     game.cave.dugCells.push(`${tx},${ty}`);
@@ -699,16 +776,34 @@ function arneDig(L, tx, ty, t) {
   }
 }
 
+function enemyInFront(L) {
+  const f = frontPoint(L, 11);
+  return map().enemies.some((e) => e.alive && Math.hypot(e.x + 8 - f.x, e.y + 10 - f.y) < (e.type === 'trollboss' ? 22 : 17));
+}
+
+function swordSwing(L) {
+  game.actT = 0.22;
+  game.swingT = 0.25;
+  game.swingKind = 'sword';
+  sfx.swing();
+  const f = frontPoint(L, 12);
+  const [dx, dy] = DIRV[L.dir];
+  for (const e of map().enemies) {
+    if (e.alive && Math.hypot(e.x + 8 - f.x, e.y + 10 - f.y) < (e.type === 'trollboss' ? 24 : 18)) damageEnemy(e, 2, dx * 12, dy * 12, 'sword');
+  }
+}
+
 function arneSwing(L) {
   game.actT = 0.25;
   game.swingT = 0.25;
+  game.swingKind = 'shovel';
   sfx.swing();
   const f = frontPoint(L, 12);
   for (const e of map().enemies) {
     if (!e.alive) continue;
     if (Math.hypot(e.x + 8 - f.x, e.y + 10 - f.y) < 16) {
       const [dx, dy] = DIRV[L.dir];
-      damageEnemy(e, 2, dx * 14, dy * 14);
+      damageEnemy(e, 2, dx * 14, dy * 14, 'shovel');
     }
   }
 }
@@ -722,7 +817,7 @@ function hurt(n) {
   game.hurtT = 1;
   sfx.hurt();
   if (st.hearts > 0 || game.challenge.active) return;
-  if (game.mapId === 'cave' || game.mapId === 'haunted') {
+  if (['cave', 'haunted', 'valley', 'under'].includes(game.mapId)) {
     st.hearts = 0;
     game.faintT = 1.6;
     game.invisT = 0;
@@ -732,7 +827,7 @@ function hurt(n) {
 
 function respawn() {
   let cp = game.checkpoint;
-  if (!cp || cp.map !== game.mapId) cp = game.mapId === 'haunted' ? HAUNT_SPAWN : CAVE_SPAWN;
+  if (!cp || cp.map !== game.mapId) cp = { haunted: HAUNT_SPAWN, valley: VALLEY_SPAWN }[game.mapId] || CAVE_SPAWN;
   const L = leader();
   L.x = cp.x; L.y = cp.y; L.dir = cp.dir;
   regroup();
@@ -741,16 +836,35 @@ function respawn() {
   game.hurtT = 1.5;
 }
 
-function damageEnemy(e, dmg, kx = 0, ky = 0) {
+// Quellen: sword, shovel, nut, fire, bomb, rock
+function damageEnemy(e, dmg, kx = 0, ky = 0, src = 'nut') {
+  if (e.type === 'guard' && !['sword', 'fire', 'bomb', 'rock'].includes(src)) {
+    sfx.clang();
+    float('Kling!', e.x + 8, e.y - 4, '#c8c8d8');
+    if (!game.seenHints.armor) { game.seenHints.armor = true; fx.toast('Die Rüstung ist zu hart! Nur ein Schwert hilft – im Tal liegt ein Schatz ...', 4); }
+    return;
+  }
+  if (e.type === 'trollboss') {
+    if (src === 'rock' || src === 'bomb') {
+      e.stunT = 3;
+      dmg = 1;
+      fx.toast('Der Troll ist benommen! Schnell, angreifen!', 2);
+    } else if (e.stunT <= 0) {
+      sfx.clang();
+      float('HOHO!', e.x + 8, e.y - 12, '#ffb0b0');
+      return;
+    } else dmg = 1;
+  }
   e.hp -= dmg;
   e.hurtT = 0.25;
   moveEnemy(e, kx, ky);
   if (e.hp > 0) { sfx.hit(); return; }
+  if (e.type === 'trollboss') { trollDefeated(e); return; }
   e.alive = false;
   game.kills++;
   sfx.pop();
   burst(e.x + 8, e.y + 8, CONFETTI, 18, 60);
-  fx.gainXP({ slime: 3, kobold: 6, bat: 2 }[e.type], e.x + 8, e.y);
+  fx.gainXP({ slime: 3, kobold: 6, bat: 2, guard: 6, bomber: 5 }[e.type] || 3, e.x + 8, e.y);
   if (e.type === 'kobold' && Math.random() < 0.6) {
     map().items.push({ id: `drop${game.dropN++}`, type: 'bag', x: e.x + 2, y: e.y + 2, taken: false, drop: true });
   }
@@ -770,7 +884,45 @@ function updateEnemies(dt) {
     const nx = dx / d, ny = dy / d;
     const sees = visible && d < 110 && lineOfSight(e.x + 8, e.y + 10, lx, ly);
 
-    if (e.type === 'bat') {
+    if (e.temp) { e.life -= dt; if (e.life <= 0) { e.alive = false; poof(e.x + 8, e.y + 8); continue; } }
+    if (e.type === 'guard') {
+      e.flip = dx < 0;
+      if (sees && (d < 56 || e.temp)) moveEnemy(e, nx * 30 * dt, ny * 30 * dt);
+      else {
+        // Patrouille um den Startpunkt
+        const tx = e.home.x + Math.sin(e.anim * 0.6 + e.id) * 24, ty = e.home.y;
+        moveEnemy(e, Math.sign(tx - e.x) * 14 * dt, Math.sign(ty - e.y) * 14 * dt);
+      }
+    } else if (e.type === 'bomber') {
+      e.flip = dx < 0;
+      if (sees) {
+        if (d > 96) moveEnemy(e, nx * 20 * dt, ny * 20 * dt);
+        else if (d < 56) moveEnemy(e, -nx * 24 * dt, -ny * 24 * dt);
+        if (e.cd <= 0 && d < 130) {
+          e.cd = 2.6;
+          e.throwT = 0.3;
+          sfx.swing();
+          throwBomb(e.x + 8, e.y + 6, lx, ly, 'enemy', e);
+        }
+      }
+    } else if (e.type === 'trollboss') {
+      e.stunT = Math.max(0, e.stunT - dt);
+      const a = map().arena;
+      const inArena = L.x > a.x0 - 8 && L.x < a.x1 + 8 && L.y > a.y0 - 8 && L.y < a.y1 + 8;
+      if (e.stunT <= 0 && inArena) {
+        e.flip = dx < 0;
+        const sp = 16 * dt;
+        const nxp = Math.max(a.x0, Math.min(a.x1, e.x + nx * sp)), nyp = Math.max(a.y0, Math.min(a.y1, e.y + ny * sp));
+        e.x = nxp; e.y = nyp;
+        if (e.cd <= 0) {
+          e.cd = 2.2;
+          e.throwT = 0.4;
+          sfx.push();
+          game.projectiles.push({ x: e.x + 8, y: e.y + 2, vx: nx * 70, vy: ny * 70, kind: 'rock', owner: 'enemy', t: 3 });
+        }
+      }
+      if (e.stunT > 0) continue; // benommen: keine Berührungsschäden
+    } else if (e.type === 'bat') {
       const wob = Math.sin(e.anim * 5 + e.id) * 30;
       if (sees && d < 90) moveEnemy(e, (nx * 38 - ny * wob * 0.5) * dt, (ny * 38 + nx * wob * 0.5) * dt);
       else moveEnemy(e, Math.cos(e.anim * 1.3 + e.id) * 22 * dt, Math.sin(e.anim * 2.1 + e.id) * 14 * dt);
@@ -804,10 +956,57 @@ function lineOfSight(x0, y0, x1, y1) {
   return true;
 }
 
+function throwBomb(x, y, tx, ty, owner, thrower) {
+  const d = Math.hypot(tx - x, ty - y) || 1;
+  const sp = 75;
+  game.projectiles.push({ kind: 'bomb', owner, x, y, tx, ty, vx: ((tx - x) / d) * sp, vy: ((ty - y) / d) * sp, fly: d / sp, fuse: -1, t: 9, from: thrower });
+}
+
+function explode(p) {
+  const m = map(), L = leader();
+  p.t = 0;
+  sfx.boom();
+  burst(p.x, p.y, ['#ffd040', '#ff7a20', '#5a5a6a', '#ffffff'], 26, 80);
+  if (Math.hypot(L.x + 8 - p.x, L.y + 10 - p.y) < 22) hurt(1);
+  for (const e of m.enemies) if (e.alive && Math.hypot(e.x + 8 - p.x, e.y + 10 - p.y) < 24) damageEnemy(e, 2, 0, 0, 'bomb');
+  const tx0 = Math.floor((p.x - 22) / TILE), tx1 = Math.floor((p.x + 22) / TILE);
+  const ty0 = Math.floor((p.y - 22) / TILE), ty1 = Math.floor((p.y + 22) / TILE);
+  let cracked = false;
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
+    if (m.tile(tx, ty) !== T.CRACK) continue;
+    if (Math.hypot(tx * TILE + 8 - p.x, ty * TILE + 8 - p.y) > 26) continue;
+    editTile(m, tx, ty, m.theme === 'valley' ? T.GRASS : T.CFLOOR);
+    burst(tx * TILE + 8, ty * TILE + 8, ['#8a7866', '#b4a48e', '#5e4e40'], 12, 60);
+    cracked = true;
+  }
+  if (cracked) { fx.toast('BUMM! Der Fels ist weg!', 2); fx.gainXP(4); save(); }
+}
+
+function updateBomb(p, dt) {
+  const L = leader();
+  if (p.fly > 0) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.fly -= dt;
+    if (p.owner === 'enemy' && Math.hypot(p.x - (L.x + 8), p.y - (L.y + 10)) < 9 && L.id === 'theo' && game.shieldT > 0) {
+      // Zurückwerfen: fliegt zum Werfer zurück
+      sfx.block();
+      const t = p.from;
+      const tx = t ? t.x + 8 : p.x - p.vx, ty = t ? t.y + 10 : p.y - p.vy;
+      const d = Math.hypot(tx - p.x, ty - p.y) || 1;
+      p.vx = ((tx - p.x) / d) * 110; p.vy = ((ty - p.y) / d) * 110; p.fly = d / 110; p.owner = 'player';
+      return;
+    }
+    if (p.fly <= 0) p.fuse = 1.4;
+    return;
+  }
+  p.fuse -= dt;
+  if (p.fuse <= 0) explode(p);
+}
+
 function updateProjectiles(dt) {
   const L = leader();
   const m = map();
   for (const p of game.projectiles) {
+    if (p.kind === 'bomb') { updateBomb(p, dt); continue; }
     p.x += p.vx * dt; p.y += p.vy * dt; p.t -= dt;
     const tx = Math.floor(p.x / TILE), ty = Math.floor(p.y / TILE);
 
@@ -826,7 +1025,7 @@ function updateProjectiles(dt) {
     }
     if (p.owner !== 'statue-start' && m.isSolidTile(tx, ty)) {
       p.t = 0;
-      burst(p.x, p.y, p.kind === 'nut' ? ['#7a3a12'] : ['#ffb040', '#ff6020'], 4, 30);
+      burst(p.x, p.y, p.kind === 'nut' ? ['#7a3a12'] : p.kind === 'rock' ? ['#9c8670', '#6e5a48'] : ['#ffb040', '#ff6020'], 4, 30);
       continue;
     }
     if (p.owner === 'enemy') {
@@ -849,7 +1048,7 @@ function updateProjectiles(dt) {
       if (e.alive && Math.hypot(p.x - (e.x + 8), p.y - (e.y + 10)) < 9) {
         p.t = 0;
         const vl = Math.hypot(p.vx, p.vy) || 1;
-        damageEnemy(e, p.kind === 'fire' ? 3 : 1, (p.vx / vl) * 6, (p.vy / vl) * 6);
+        damageEnemy(e, p.kind === 'fire' ? 3 : p.kind === 'rock' ? 2 : 1, (p.vx / vl) * 6, (p.vy / vl) * 6, p.kind);
         break;
       }
     }
@@ -966,7 +1165,7 @@ function checkPickups() {
     const st = game.stats;
     if (it.type === 'apple' && st.hearts >= st.maxHearts) continue;
     it.taken = true;
-    if (!it.drop) (m.id === 'haunted' ? game.haunt.taken : game.cave.taken).push(it.id);
+    if (!it.drop) ({ haunted: game.haunt.taken, valley: game.valley.taken, under: game.valley.taken }[m.id] || game.cave.taken).push(it.id);
     sfx.item();
     switch (it.type) {
       case 'crystal': game.diamonds += 2; fx.toast('Ein Kristall! +2 Diamanten', 2.5); break;
@@ -976,7 +1175,8 @@ function checkPickups() {
         game.ammo += 10;
         fx.toast(game.owned.sling ? '+10 Kastanien für Felix!' : '+10 Kastanien – mit einer Schleuder könnte Felix sie werfen.', 3);
         break;
-      case 'key': game.cave.key = true; fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in die Schlosstür in der Halle', '#f8d848'); break;
+      case 'key': if (m.id === 'under') { game.valley.key = true; fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in die Felsentür im Tal', '#f8d848'); break; }
+        game.cave.key = true; fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in die Schlosstür in der Halle', '#f8d848'); break;
     }
     save();
   }
@@ -1019,7 +1219,7 @@ function checkAreas() {
 function checkWarps() {
   const m = map();
   const L = leader();
-  if (game.invisT > 0 && m.id !== 'cave') return;
+  if (game.invisT > 0 && m.id === 'village') return;
   const tx = Math.floor((L.x + 8) / TILE), ty = Math.floor((L.y + 12) / TILE);
   const wp = m.warpAt(tx, ty);
   if (wp) { goTo(wp.to, wp.tx, wp.ty, wp.dir); return; }
@@ -1041,8 +1241,122 @@ function checkWarps() {
   if (m.id === 'haunted') {
     const t = m.tile(tx, ty);
     if (t === T.UP) goTo('cave', 3 * TILE, 10 * TILE + 8, 1);
-    else if (t === T.DOWN) { endInvisibility(true); game.haunt.done = true; endChapter(3); }
+    else if (t === T.DOWN) {
+      endInvisibility(true);
+      if (game.haunt.done) { goTo('valley', VALLEY_SPAWN.x, VALLEY_SPAWN.y, VALLEY_SPAWN.dir); return; }
+      game.haunt.done = true;
+      endChapter(3);
+    }
   }
+  if (m.id === 'valley') {
+    if (m.tile(tx, ty) === T.UP) { goTo('haunted', 24 * TILE, 9 * TILE, 0); return; }
+    if (L.y + 8 < 2) {
+      if (!game.valley.troll) {
+        L.y = 4 * TILE; regroup();
+        fx.toast('Der Troll lässt euch nicht durch!', 2);
+      } else { game.valley.done = true; endChapter(4); }
+    }
+  }
+}
+
+// --- Kapitel 4: Tal der Trolle -------------------------------------------------------
+
+function editTile(m, x, y, t) {
+  m.setTile(x, y, t);
+  if (m.id === 'valley' || m.id === 'under') game.valley.edits.push([m.id, x, y, t]);
+}
+
+// Gespeicherten Fortschritt auf die Karten anwenden
+function applyValley() {
+  const v = game.valley, vm = game.maps.valley, um = game.maps.under;
+  for (const [id, x, y, t] of v.edits || []) game.maps[id].setTile(x, y, t);
+  if (v.sword) vm.chest.open = true;
+  if (v.lever) vm.openGate();
+  if (v.door) vm.setTile(21, 8, T.PATH);
+  if (v.key) for (const it of um.items) if (it.type === 'key') it.taken = true;
+  if (v.troll) { vm.enemies = vm.enemies.filter((e) => e.type !== 'trollboss'); addTrollFriend(); }
+  for (const m of [vm, um]) for (const it of m.items) if (v.taken.includes(it.id)) it.taken = true;
+}
+
+function openChest() {
+  const m = map();
+  if (m.chest.open) { dialog.open(['Die Truhe ist leer.']); return; }
+  m.chest.open = true;
+  game.owned.sword = true;
+  game.valley.sword = true;
+  sfx.levelUp();
+  fx.banner('DAS SCHWERT!', 'Theo greift mit B an, wenn ein Gegner vor ihm steht', '#f8d848');
+  fx.gainXP(10);
+  save();
+}
+
+function updateSpitters(dt) {
+  const m = map();
+  if (!m.spitters) return;
+  const L = leader();
+  m.spitters.forEach((sp, i) => {
+    const obj = m.spitterObjs[i];
+    if (sp.door && game.valley.door) { obj.hidden = true; return; }
+    sp.cd -= dt;
+    const d = Math.hypot(L.x + 8 - (sp.x * TILE + 8), L.y + 10 - (sp.y * TILE + 8));
+    if (sp.cd > 0 || d > 7 * TILE) return;
+    sp.cd = sp.gap;
+    const [dx, dy] = DIRV[sp.dir];
+    sfx.fire();
+    game.projectiles.push({ x: sp.x * TILE + 8 + dx * 12, y: sp.y * TILE + 8 + dy * 12, vx: dx * sp.speed, vy: dy * sp.speed, kind: 'fire', owner: 'enemy', t: 3 });
+  });
+}
+
+function updateSearchlight(dt) {
+  const m = map();
+  const sl = m.searchlight;
+  if (!sl) return;
+  sl.angle += dt * 0.75;
+  sl.alarmT = Math.max(0, sl.alarmT - dt);
+  sl.cd = Math.max(0, (sl.cd || 0) - dt);
+  if (game.invisT > 0 || sl.cd > 0) return;
+  const L = leader();
+  const cx = sl.x * TILE + 8, cy = sl.y * TILE - 8;
+  const dx = L.x + 8 - cx, dy = L.y + 10 - cy, d = Math.hypot(dx, dy);
+  if (d > 88 || d < 6) return;
+  let da = Math.atan2(dy, dx) - sl.angle;
+  da = Math.atan2(Math.sin(da), Math.cos(da));
+  if (Math.abs(da) > 0.42) return;
+  // Entdeckt!
+  sl.alarmT = 3;
+  sl.cd = 9;
+  sfx.alarm();
+  fx.toast('ALARM! Der Suchscheinwerfer hat euch entdeckt – Wächter kommen!', 3);
+  let n = 0;
+  for (const [ox, oy] of [[-2, 1], [2, 1], [0, 2], [-1, -1], [1, -1]]) {
+    const ex = (sl.x + ox) * TILE, ey = (sl.y + oy) * TILE;
+    if (wallHit(ex, ey) || n >= 3) continue;
+    m.enemies.push({ id: 100 + game.dropN++, type: 'guard', x: ex, y: ey, hp: 3, cd: 1, hurtT: 0, alive: true, anim: 0, flip: false,
+      throwT: 0, home: { x: ex, y: ey }, stunT: 0, temp: true, life: 18 });
+    poof(ex + 8, ey + 8);
+    n++;
+  }
+}
+
+function addTrollFriend() {
+  const vm = game.maps.valley;
+  if (!vm.npcs.some((n) => n.id === 'trollfriend')) vm.npcs.push({ id: 'trollfriend', x: 19 * TILE, y: 5 * TILE, dir: 0, anim: 0, moving: false, big: true });
+}
+
+function trollDefeated(e) {
+  e.alive = false;
+  game.valley.troll = true;
+  sfx.levelUp();
+  burst(e.x + 8, e.y + 4, CONFETTI, 30, 70);
+  addTrollFriend();
+  fx.gainXP(30, e.x + 8, e.y - 10);
+  dialog.open([
+    'Troll: Uff ... Aua ... Schon gut, schon gut! Ihr seid stärker als ihr ausseht.',
+    'Troll: Ich heiße Grummel. Hier im Tal hat sich noch nie jemand an mir vorbeigetraut.',
+    game.valley.lever ? 'Grummel: Das Gitter ist offen. Geht nur – der Drache wartet hinter den Bergen!'
+      : 'Grummel: Das Gitter öffnet nur der Hebel auf dem Felsvorsprung im Westen. Den erreicht ihr über Höhle E.',
+  ]);
+  save();
 }
 
 function endChapter(n) {
@@ -1223,8 +1537,9 @@ function drawShovel(L, sx, sy) {
   const a = base + (prog - 0.5) * 2 * (L.dir === 2 || L.dir === 1 ? -1 : 1);
   const hx = sx + 8, hy = sy + 10;
   for (let i = 3; i < 15; i++) {
-    g.fillStyle = i > 11 ? '#c8c8d8' : '#7a4a24';
-    const w = i > 11 ? 3 : 2;
+    const sword = game.swingKind === 'sword';
+    g.fillStyle = sword ? (i < 6 ? '#6a4a2a' : i < 7 ? '#f0c838' : '#e8e8f8') : (i > 11 ? '#c8c8d8' : '#7a4a24');
+    const w = sword ? (i === 6 ? 4 : 2) : (i > 11 ? 3 : 2);
     g.fillRect(Math.round(hx + Math.cos(a) * i) - 1, Math.round(hy + Math.sin(a) * i) - 1, w, w);
   }
 }
@@ -1264,7 +1579,7 @@ function renderWorld(cam) {
   drawTiles(g, m, cam.x, cam.y, game.time);
 
   const list = [];
-  for (const o of m.objects) list.push({ y: o.sortY, draw: () => o.draw(g, cam.x, cam.y, game.time) });
+  for (const o of m.objects) if (!o.hidden) list.push({ y: o.sortY, draw: () => o.draw(g, cam.x, cam.y, game.time) });
   for (const n of m.npcs) list.push({ y: n.y + 16, draw: () => drawCharacter(n, cam) });
   for (const it of m.items) {
     if (it.taken) continue;
@@ -1283,6 +1598,25 @@ function renderWorld(cam) {
     list.push({ y: e.y + 16, draw: () => {
       if (e.hurtT > 0 && Math.floor(game.time * 30) % 2) return;
       const sx = Math.round(e.x - cam.x), sy = Math.round(e.y - cam.y);
+      if (e.type === 'trollboss') {
+        g.drawImage(trollSprite(e.throwT > 0 || e.hurtT > 0 ? 1 : 0), sx - 4, sy - 10);
+        if (e.stunT > 0) {
+          for (let i = 0; i < 3; i++) {
+            const a = game.time * 4 + (i * Math.PI * 2) / 3;
+            g.fillStyle = '#f8d848'; g.fillRect(Math.round(sx + 8 + Math.cos(a) * 9), Math.round(sy - 12 + Math.sin(a) * 3), 2, 2);
+          }
+        }
+        // Lebensbalken
+        g.fillStyle = '#1a1020'; g.fillRect(sx - 3, sy - 16, 22, 4);
+        g.fillStyle = '#e83848'; g.fillRect(sx - 2, sy - 15, Math.round((20 * e.hp) / HP.trollboss), 2);
+        return;
+      }
+      if (e.type === 'guard' || e.type === 'bomber') {
+        const spr = e.type === 'guard' ? guardSprite(e.flip, Math.floor(e.anim * 4) % 2) : bomberSprite(e.flip, e.throwT > 0 ? 1 : 0);
+        shadow(sx, sy);
+        g.drawImage(spr, sx, sy + 16 - spr.height);
+        return;
+      }
       if (e.type === 'bat') {
         g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(sx + 5, sy + 15, 6, 1);
         g.drawImage(batSprite(Math.floor(e.anim * 8) % 2), sx, sy + Math.round(Math.sin(e.anim * 4) * 2));
@@ -1300,10 +1634,24 @@ function renderWorld(cam) {
 
   for (const p of game.projectiles) {
     const px = Math.round(p.x - cam.x), py = Math.round(p.y - cam.y);
-    if (p.kind === 'nut') g.drawImage(itemSprite('chestnut'), px - 2, py - 2);
+    if (p.kind === 'bomb') {
+      const lift = p.fly > 0 ? Math.round(Math.sin(Math.min(1, p.fly) * Math.PI) * 6) : 0;
+      g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(px - 3, py + 3, 6, 2);
+      g.drawImage(bombSprite(p.fuse > 0 && Math.floor(game.time * (p.fuse < 0.6 ? 16 : 6)) % 2 ? 1 : 0), px - 5, py - 6 - lift);
+    } else if (p.kind === 'rock') g.drawImage(rockSprite(), px - 5, py - 5);
+    else if (p.kind === 'nut') g.drawImage(itemSprite('chestnut'), px - 2, py - 2);
     else g.drawImage(fireSprite(Math.floor(game.time * 10) % 2, !!p.reflected), px - 4, py - 4);
   }
   for (const pt of game.particles) { g.fillStyle = pt.c; g.fillRect(Math.round(pt.x - cam.x), Math.round(pt.y - cam.y), 2, 2); }
+
+  if (m.searchlight && game.state !== 'title') {
+    const sl = m.searchlight;
+    const cx = sl.x * TILE + 8 - cam.x, cy = sl.y * TILE - 8 - cam.y;
+    g.fillStyle = sl.alarmT > 0 ? 'rgba(255,60,60,0.28)' : 'rgba(255,245,170,0.26)';
+    g.beginPath(); g.moveTo(cx, cy);
+    g.arc(cx, cy, 88, sl.angle - 0.42, sl.angle + 0.42);
+    g.closePath(); g.fill();
+  }
 
   // Höhle: Dunkelheit mit Lichtkreis um die Gruppe
   if (m.theme === 'cave' && game.state !== 'title') {
@@ -1361,7 +1709,7 @@ function renderWorld(cam) {
 function abilityLabel(id) {
   const o = game.owned;
   const parts = {
-    theo: [o.shield && 'Schild'],
+    theo: [o.shield && 'Schild', o.sword && 'Schwert'],
     felix: [o.strength && 'Stärke', o.sling && `Schleuder (${game.ammo})`],
     arne: [o.dig && 'Graben', o.shovel && 'Schaufel'],
     friedrich: [o.invis && 'Unsichtbar'],
@@ -1499,7 +1847,7 @@ function renderTitle() {
   text('Theo und der Drache vom Buttenberg', W / 2, 58, { size: 6, align: 'center', color: '#e8f0ff' });
   (game.titleCache || titleItems()).forEach((it, i) => {
     const sel = i === game.menu;
-    text((sel ? '> ' : '  ') + it.label, 70, 88 + i * 13, { size: 7, color: sel ? '#f8d848' : '#b8c8e8' });
+    text((sel ? '> ' : '  ') + it.label, 66, 78 + i * 12, { size: 7, color: sel ? '#f8d848' : '#b8c8e8' });
   });
   if (Math.floor(game.time * 2) % 2 === 0) {
     text(isTouch() ? 'Steuerkreuz wählen, A starten' : 'Hoch/Runter wählen, Leertaste/A starten', W / 2, 136, { size: 5, align: 'center', color: '#a8f070' });
@@ -1510,6 +1858,7 @@ function renderTitle() {
 function renderEnd() {
   if (game.endT < 0.6) return;
   if (game.endChapter === 3) return renderEnd3();
+  if (game.endChapter === 4) return renderEnd4();
   const st = game.stats, c = game.maps.cave, cv = game.cave;
   const crystals = c.items.filter((i) => i.type === 'crystal' && i.taken).length;
   text('ENDE KAPITEL 2', W / 2, 18, { size: 12, align: 'center', color: '#f8d848' });
@@ -1529,6 +1878,26 @@ function renderEnd() {
   if (game.endT > 1.5 && Math.floor(game.time * 2) % 2 === 0) text('A: Weiterspielen', W / 2, 138, { size: 6, align: 'center', color: '#a8f070' });
 }
 
+function renderEnd4() {
+  const st = game.stats, v = game.maps.valley, u = game.maps.under;
+  const crystals = [...v.items, ...u.items].filter((i) => i.type === 'crystal');
+  text('ENDE KAPITEL 4', W / 2, 18, { size: 12, align: 'center', color: '#f8d848' });
+  text('Das Tal der Trolle ist geschafft!', W / 2, 40, { size: 6, align: 'center' });
+  const rows = [
+    ['Kristalle', `${crystals.filter((i) => i.taken).length} / ${crystals.length}`],
+    ['Gegner besiegt', String([...v.enemies, ...u.enemies].filter((e) => !e.alive && !e.temp).length)],
+    ['Troll Grummel', 'besiegt!'],
+    ['Diamanten', String(game.diamonds)],
+    ['Level', String(st.level)],
+  ];
+  rows.forEach(([a, b], i) => {
+    text(a, 40, 56 + i * 11, { size: 6, color: '#b8c8e8' });
+    text(b, 200, 56 + i * 11, { size: 6, align: 'right', color: '#a8f070' });
+  });
+  text('Fortsetzung folgt: Der Drache vom Buttenberg', W / 2, 120, { size: 6, align: 'center' });
+  if (game.endT > 1.5 && Math.floor(game.time * 2) % 2 === 0) text('A: Weiterspielen', W / 2, 138, { size: 6, align: 'center', color: '#a8f070' });
+}
+
 function renderEnd3() {
   const st = game.stats, m = game.maps.haunted;
   text('ENDE KAPITEL 3', W / 2, 18, { size: 12, align: 'center', color: '#f8d848' });
@@ -1544,7 +1913,7 @@ function renderEnd3() {
     text(a, 40, 56 + i * 11, { size: 6, color: '#b8c8e8' });
     text(b, 200, 56 + i * 11, { size: 6, align: 'right', color: '#a8f070' });
   });
-  text('Fortsetzung folgt: Die Drachenhöhle', W / 2, 120, { size: 6, align: 'center' });
+  text('Als Nächstes: Das Tal der Trolle', W / 2, 120, { size: 6, align: 'center' });
   if (game.endT > 1.5 && Math.floor(game.time * 2) % 2 === 0) text('A: Weiterspielen', W / 2, 138, { size: 6, align: 'center', color: '#a8f070' });
 }
 

@@ -46,6 +46,9 @@ export const sfx = {
   hit: () => tone(180, 0.07, { vol: 0.05, slide: 120 }),
   fire: () => tone(160, 0.25, { type: 'sawtooth', vol: 0.04, slide: 60 }),
   door: () => tone(70, 0.45, { type: 'sawtooth', vol: 0.05, slide: 110 }),
+  alarm: () => { for (let i = 0; i < 4; i++) { tone(880, 0.12, { vol: 0.06, when: i * 0.25 }); tone(660, 0.12, { vol: 0.06, when: i * 0.25 + 0.12 }); } },
+  boom: () => { tone(120, 0.4, { type: 'sawtooth', vol: 0.08, slide: 40 }); tone(60, 0.5, { type: 'square', vol: 0.06, when: 0.05, slide: 30 }); },
+  clang: () => { tone(1500, 0.06, { vol: 0.05 }); tone(1100, 0.1, { vol: 0.04, when: 0.05 }); },
   swap: () => { tone(500, 0.05); tone(750, 0.06, { when: 0.05 }); },
   start: () => [392, 523, 659, 784].forEach((f, i) => tone(f, 0.09, { when: i * 0.07 })),
 };

@@ -43,7 +43,25 @@ startet am letzten Rastplatz.
 
 Falsche Antworten kosten nichts – es kommt einfach eine neue Frage (die Lösung wird nicht verraten).
 
+**4 – Das Tal der Trolle** (nach Theos Karten): Eine Insel, durch Klippen in Zonen geteilt – nur die Höhlen
+A–E verbinden sie über die Unterwelt.
+
+| Ort | Was passiert |
+|---|---|
+| Süden, Höhle A | Eingang; Schwertwächter (Rüstung – nur das Schwert hilft) |
+| Unterwelt A → B | Schleime und Fledermäuse |
+| Talmitte (Höhlen B, D) | Suchscheinwerfer dreht sich – wer ins Licht gerät, löst Alarm aus und Wächter kommen. Friedrich schleicht unsichtbar zur Schatztruhe: **das Schwert** |
+| Unterwelt D | Schwertwächter, Schlüsselraum mit Feuerspuckern; Fels (Felix) zu E, Erdmauer (Arne) zu C, zwei Kristallkammern |
+| Westen, Höhle E | Hebel öffnet das Ausgangsgitter |
+| Osten, Höhle C | Bombenwerfer – seine Bomben sprengen die rissigen Felsen (oder Theo wirft sie zurück); Felsentür mit Feuerspuck braucht den Schlüssel |
+| Norden | Troll Grummel: Felsbrocken mit dem Schild zurückwerfen → benommen → mit dem Schwert angreifen |
+
+Theo greift mit **B** an, wenn ein Gegner direkt vor ihm steht – sonst hebt er den Schild.
+
 Der Spielstand wird automatisch im Browser gespeichert („Weiterspielen“ im Titelbild).
+Im Spiel öffnet **Esc / P** (Gamepad: Start, Touch: ☰) das Menü: 3 Speicherplätze und ein **Speichercode**
+zum Abschreiben (auch als Link: `?code=XXXX-XXXX-XXXX-XXXX-XXXX`). Über **Kapitel wählen** im Titelbild
+startet man jedes Kapitel direkt – mit allen Fähigkeiten, die man bis dahin hätte.
 
 ## Steuerung
 
@@ -100,14 +118,14 @@ python -m http.server 8000
 ```
 index.html        Seite, Touch-Steuerung, Styles
 src/main.js       Spielschleife, Gruppe, Fähigkeiten, Kampf, Kartenwechsel, HUD
-src/maps.js       Karten: Dorf, Schule, Laden, Höhle, Spukhaus (Layout, Gegner, Gegenstände, Hinweise)
+src/maps.js       Karten: Dorf, Schule, Laden, Höhle, Spukhaus, Tal der Trolle + Unterwelt
 src/world.js      Tile-System, Kollision, Tile- und Objektgrafik
 src/npcs.js       Figuren, Dialoge, Quest-Schritte und Hinweise
 src/quiz.js       Lernaufgaben der Schule (Fragenpools + Mathe-Generator)
 src/halloween.js  Halloween-, Lehrbuch-, Binär- und Divisionsaufgaben
 src/shop.js       Ladenangebot und Kauf
-src/ui.js         Menüs für Schule, Laden und Rätseltüren
-src/save.js       Spielstand (localStorage)
+src/ui.js         Menüs: Schule, Laden, Rätseltüren, Pause/Speichern, Kapitelauswahl
+src/save.js       Spielstände (localStorage, 3 Plätze) und Speichercode
 src/sprites.js    Figuren-, Gegner- und Gegenstands-Sprites
 src/dialog.js     Dialogbox mit Schreibmaschinen-Effekt
 src/input.js      Tastatur, Touch, Gamepad
