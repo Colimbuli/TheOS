@@ -76,10 +76,10 @@ export function makeMap({ id, w, h, fill, edge, theme }) {
 
 export const COL = {
   out: '#1a1020',
-  grass: '#68b850', grassD: '#4a9640', grassL: '#8ad468',
-  path: '#e4cc94', pathD: '#c9ab70', pathL: '#f2e0b0',
-  water: '#3a80d8', waterD: '#2a60b0', waterL: '#8cc4f8', foam: '#e8f4ff',
-  leafO: '#163d1e', leafD: '#23662e', leaf: '#2f8a3c', leafL: '#5cb84a',
+  grass: '#68b850', grassD: '#4a9640', grassL: '#8ad468', grassM: '#5ca848', grassS: '#3f8436',
+  path: '#e4cc94', pathD: '#d2b47c', pathL: '#f2e0b0', pathE: '#a88a52',
+  water: '#3a80d8', waterD: '#2a60b0', waterL: '#8cc4f8', waterM: '#4a92e4', foam: '#e8f4ff', bank: '#3a6a2c',
+  leafO: '#163d1e', leafD: '#23662e', leaf: '#2f8a3c', leafM: '#42a046', leafL: '#6cc858',
   trunk: '#6e4626', trunkD: '#4a2e18',
   bush: '#3c9e3c', bushD: '#256e2a', bushL: '#78cc58', bushO: '#174a1c',
   rock: '#a4a4b4', rockD: '#6c6c80', rockL: '#d4d4e0',
@@ -108,15 +108,24 @@ const tileCache = new Map();
 function variant(world, tx, ty, t, frame) {
   const tl = (x, y) => world.tile(x, y);
   switch (t) {
-    case T.GRASS: case T.FLOWER: return hash(tx, ty) % 4;
+    case T.GRASS: case T.FLOWER: {
+      // Wiesenecken zwischen zwei Wegseiten werden rund abgeschnitten
+      const isP = (x, y) => { const n = tl(x, y); return n === T.PATH || n === T.GATE; };
+      const n = isP(tx, ty - 1), e = isP(tx + 1, ty), so = isP(tx, ty + 1), w = isP(tx - 1, ty);
+      const cut = (n && e ? 1 : 0) | (so && e ? 2 : 0) | (so && w ? 4 : 0) | (n && w ? 8 : 0);
+      return (hash(tx, ty) % 4) + cut * 4;
+    }
     case T.PATH: {
-      const isP = (x, y) => { const n = tl(x, y); return n === T.PATH || n === T.GATE || y < 0; };
-      return (isP(tx, ty - 1) ? 0 : 1) | (isP(tx + 1, ty) ? 0 : 2) | (isP(tx, ty + 1) ? 0 : 4) | (isP(tx - 1, ty) ? 0 : 8);
+      const isP = (x, y) => { const n = tl(x, y); return n === T.PATH || n === T.GATE || n === T.RGATE || y < 0; };
+      return mask8(isP, tx, ty) + (hash(tx, ty) % 2) * 256;
     }
     case T.WATER: {
-      const land = (x, y) => tl(x, y) !== T.WATER;
-      const m = (land(tx, ty - 1) ? 1 : 0) | (land(tx + 1, ty) ? 2 : 0) | (land(tx, ty + 1) ? 4 : 0) | (land(tx - 1, ty) ? 8 : 0);
-      return m + frame * 16;
+      const isW = (x, y) => tl(x, y) === T.WATER;
+      return mask8(isW, tx, ty) + (frame % 2) * 256 + (world.theme === 'cave' ? 512 : 0);
+    }
+    case T.TREE: {
+      const isT = (x, y) => tl(x, y) === T.TREE;
+      return (isT(tx, ty - 1) ? 1 : 0) | (isT(tx + 1, ty) ? 2 : 0) | (isT(tx, ty + 1) ? 4 : 0) | (isT(tx - 1, ty) ? 8 : 0);
     }
     case T.FENCE: case T.DIGFENCE: case T.TUNNEL: {
       const f = (x, y) => { const n = tl(x, y); return n === T.FENCE || n === T.DIGFENCE || n === T.TUNNEL; };
@@ -141,7 +150,7 @@ function variant(world, tx, ty, t, frame) {
 }
 
 function tileImage(t, v) {
-  const key = t * 1000 + v;
+  const key = t * 100000 + v;
   let c = tileCache.get(key);
   if (c) return c;
   c = document.createElement('canvas');
@@ -166,6 +175,74 @@ export function drawTiles(g, world, camX, camY, time, viewW = 240, viewH = 160) 
 
 const px = (g, c, x, y, w = 1, h = 1) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
 
+// 8er-Nachbarschaft: Bit gesetzt = Nachbar ist ANDERS (Kante).
+// 1 N, 2 O, 4 S, 8 W, 16 NO, 32 SO, 64 SW, 128 NW
+function mask8(same, tx, ty) {
+  const d = (x, y) => (same(tx + x, ty + y) ? 0 : 1);
+  return d(0, -1) | d(1, 0) << 1 | d(0, 1) << 2 | d(-1, 0) << 3
+    | d(1, -1) << 4 | d(1, 1) << 5 | d(-1, 1) << 6 | d(-1, -1) << 7;
+}
+
+// Abstand jedes Pixels zur Kante (negativ = außerhalb). Außenecken mit Radius rO, Innenecken mit rI.
+const fieldCache = new Map();
+function distField(m, rO = 6, rI = 3) {
+  const key = m * 100 + rO * 10 + rI;
+  let f = fieldCache.get(key);
+  if (f) return f;
+  f = new Float32Array(256);
+  const N = m & 1, E = m & 2, S = m & 4, Wb = m & 8;
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const cx = x + 0.5, cy = y + 0.5;
+      let d = 99;
+      if (N) d = Math.min(d, cy);
+      if (S) d = Math.min(d, 16 - cy);
+      if (Wb) d = Math.min(d, cx);
+      if (E) d = Math.min(d, 16 - cx);
+      const outer = (ccx, ccy, inX, inY) => { if (inX && inY) d = Math.min(d, rO - Math.hypot(cx - ccx, cy - ccy)); };
+      if (N && Wb) outer(rO, rO, cx < rO, cy < rO);
+      if (N && E) outer(16 - rO, rO, cx > 16 - rO, cy < rO);
+      if (S && E) outer(16 - rO, 16 - rO, cx > 16 - rO, cy > 16 - rO);
+      if (S && Wb) outer(rO, 16 - rO, cx < rO, cy > 16 - rO);
+      if (rI <= 0) { f[y * 16 + x] = d; continue; }
+      if (!N && !Wb && (m & 128)) d = Math.min(d, Math.hypot(cx, cy) - rI);
+      if (!N && !E && (m & 16)) d = Math.min(d, Math.hypot(16 - cx, cy) - rI);
+      if (!S && !E && (m & 32)) d = Math.min(d, Math.hypot(16 - cx, 16 - cy) - rI);
+      if (!S && !Wb && (m & 64)) d = Math.min(d, Math.hypot(cx, 16 - cy) - rI);
+      f[y * 16 + x] = d;
+    }
+  }
+  fieldCache.set(key, f);
+  return f;
+}
+
+// Zeichnet "innen" (mit Abstandsfeld) über einen bereits gemalten Hintergrund.
+// colorAt(d, x, y) liefert die Farbe für Pixel mit Abstand d (oder null = Hintergrund lassen).
+function paintField(g, m, colorAt, rO, rI) {
+  const f = distField(m, rO, rI);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const c = colorAt(f[y * 16 + x], x, y);
+    if (c) px(g, c, x, y);
+  }
+}
+
+// Periodische Blätterbüschel (16er-Raster, nahtlos über Kacheln hinweg)
+const CLUSTERS = [[4, 3], [12, 3], [0, 9], [8, 9], [16, 9], [4, 15], [12, 15], [4, -1], [12, -1]];
+function leafShade(x, y, c) {
+  const cx = x + 0.5, cy = y + 0.5;
+  let best = 99, bx = 0, by = 0;
+  for (const [px0, py0] of CLUSTERS) {
+    const d = Math.hypot(cx - px0, cy - py0);
+    if (d < best) { best = d; bx = cx - px0; by = cy - py0; }
+  }
+  if (best > 4.3) return c.d;
+  const s = bx + by;
+  if (s < -2.2) return c.l;
+  if (s < -0.6) return c.m;
+  if (s > 2.4) return c.d;
+  return c.b;
+}
+
 function blob(g, cx, cy, rx, ry, colorFn) {
   for (let y = 0; y < 16; y++) {
     for (let x = 0; x < 16; x++) {
@@ -179,76 +256,128 @@ function blob(g, cx, cy, rx, ry, colorFn) {
 function paintGrass(g, v) {
   px(g, COL.grass, 0, 0, 16, 16);
   const r = rng(17 + v * 31);
-  const n = v === 3 ? 2 : 4;
+  // feine Struktur
+  for (let i = 0; i < 22; i++) px(g, i % 4 ? COL.grassM : COL.grassL, (r() * 16) | 0, (r() * 16) | 0);
+  // Grasbüschel: dunkler Ansatz, helle Spitzen
+  const n = v === 3 ? 2 : 3;
   for (let i = 0; i < n; i++) {
-    const x = 1 + ((r() * 12) | 0), y = 2 + ((r() * 11) | 0);
-    px(g, COL.grassD, x, y + 1); px(g, COL.grassD, x + 2, y + 1); px(g, COL.grassD, x + 1, y + 2);
-    px(g, COL.grassL, x + 1, y);
+    const x = 1 + ((r() * 12) | 0), y = 3 + ((r() * 10) | 0);
+    px(g, COL.grassD, x, y + 2, 4, 1);
+    px(g, COL.grassD, x, y + 1); px(g, COL.grassD, x + 3, y + 1);
+    px(g, COL.grassL, x, y); px(g, COL.grassM, x + 1, y + 1); px(g, COL.grassL, x + 2, y - 1); px(g, COL.grassM, x + 3, y);
   }
 }
 
 const FLOWER_COLS = ['#f05050', '#f8e050', '#ffffff', '#e070e0'];
 
+// Abgerundete Wiesenecke: außerhalb des Kreises liegt Weg
+function cutGrassCorners(g, cut) {
+  if (!cut) return;
+  const r = 6;
+  const corners = [[1, 16 - r, r], [2, 16 - r, 16 - r], [4, r, 16 - r], [8, r, r]];
+  for (const [bit, ccx, ccy] of corners) {
+    if (!(cut & bit)) continue;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const cx = x + 0.5, cy = y + 0.5;
+      const inX = bit === 1 || bit === 2 ? cx > ccx : cx < ccx;
+      const inY = bit === 1 || bit === 8 ? cy < ccy : cy > ccy;
+      if (!inX || !inY) continue;
+      const d = Math.hypot(cx - ccx, cy - ccy) - r;  // > 0: außerhalb der Wiese
+      if (d < -1) continue;
+      px(g, d < 0 ? COL.grassS : d < 1 ? COL.pathE : d < 2 ? COL.pathD : COL.path, x, y);
+    }
+  }
+}
+
 const PAINT = {
-  [T.GRASS]: paintGrass,
+  [T.GRASS](g, v) { paintGrass(g, v & 3); cutGrassCorners(g, v >> 2); },
 
   [T.FLOWER](g, v) {
-    paintGrass(g, v);
-    const r = rng(99 + v * 7);
+    paintGrass(g, v & 3);
+    const r = rng(99 + (v & 3) * 7);
     for (let i = 0; i < 3; i++) {
       const x = 2 + ((r() * 11) | 0), y = 2 + ((r() * 11) | 0);
       const c = FLOWER_COLS[(r() * 4) | 0];
       px(g, c, x - 1, y); px(g, c, x + 1, y); px(g, c, x, y - 1); px(g, c, x, y + 1);
       px(g, c === '#f8e050' ? '#e07020' : '#f8d030', x, y);
     }
+    cutGrassCorners(g, v >> 2);
   },
 
-  [T.PATH](g, mask) {
-    px(g, COL.path, 0, 0, 16, 16);
-    const r = rng(5 + mask);
-    for (let i = 0; i < 7; i++) px(g, i % 2 ? COL.pathD : COL.pathL, 1 + ((r() * 14) | 0), 1 + ((r() * 14) | 0));
-    if (mask & 1) { px(g, COL.grass, 0, 0, 16, 1); px(g, COL.pathD, 0, 1, 16, 1); }
-    if (mask & 2) { px(g, COL.grass, 15, 0, 1, 16); px(g, COL.pathD, 14, 0, 1, 16); }
-    if (mask & 4) { px(g, COL.grass, 0, 15, 16, 1); px(g, COL.pathD, 0, 14, 16, 1); }
-    if (mask & 8) { px(g, COL.grass, 0, 0, 1, 16); px(g, COL.pathD, 1, 0, 1, 16); }
+  [T.PATH](g, v) {
+    const m = v & 255;
+    paintGrass(g, v >> 8);
+    const r = rng(5 + (v >> 8) * 13);
+    const speck = new Map();
+    for (let i = 0; i < 9; i++) speck.set(((r() * 16) | 0) + ((r() * 16) | 0) * 16, i % 3 ? COL.pathD : COL.pathL);
+    paintField(g, m, (d, x, y) => {
+      if (d < -1) return null;
+      if (d < 0) return COL.grassS;          // weicher Schatten auf der Wiese
+      if (d < 1) return COL.pathE;           // dunkle Randlinie
+      if (d < 2) return COL.pathD;
+      return speck.get(x + y * 16) || COL.path;
+    }, 6, 0);
   },
 
   [T.WATER](g, v) {
-    const mask = v & 15, frame = v >> 4;
-    px(g, COL.water, 0, 0, 16, 16);
-    for (const [row, off] of [[4, 0], [10, 7]]) {
-      const x0 = (frame * 2 + off) % 16;
-      px(g, COL.waterL, x0, row, 4, 1);
-      px(g, COL.waterL, (x0 + 8) % 16, row + 2, 3, 1);
-    }
-    if (mask & 1) { px(g, COL.foam, 0, 0, 16, 2); px(g, COL.waterD, 0, 2, 16, 1); }
-    if (mask & 2) { px(g, COL.foam, 14, 0, 2, 16); px(g, COL.waterD, 13, 0, 1, 16); }
-    if (mask & 4) { px(g, COL.foam, 0, 14, 16, 2); }
-    if (mask & 8) { px(g, COL.foam, 0, 0, 2, 16); px(g, COL.waterD, 2, 0, 1, 16); }
+    const m = v & 255, frame = (v >> 8) & 1, cave = v & 512;
+    if (cave) PAINT[T.CFLOOR](g, 0); else paintGrass(g, 1);
+    const wave = (x, y) => {
+      const w = Math.sin((x + frame * 3) * 0.8 + y * 1.7) + Math.sin(y * 0.9 - frame * 2);
+      return w > 1.45;
+    };
+    paintField(g, m, (d, x, y) => {
+      if (d < -1.5) return null;
+      if (d < 0) return cave ? '#3a302a' : COL.bank;   // Uferkante
+      if (d < 1.2) return COL.foam;
+      if (d < 2.6) return COL.waterL;
+      if (d < 3.6) return COL.water;
+      return wave(x, y) ? COL.waterL : (((x * 7 + y * 3) % 11) === 0 ? COL.waterM : COL.water);
+    }, 7, 4);
   },
 
-  [T.TREE](g) {
+  [T.TREE](g, nb) {
+    // Jede Kachel eine runde Krone; im Wald überlappen die Kronen, die Lücken sind dunkler Schatten
     paintGrass(g, 3);
-    px(g, COL.trunk, 6, 12, 4, 4); px(g, COL.trunkD, 6, 15, 4, 1); px(g, COL.trunkD, 9, 12, 1, 3);
-    blob(g, 8, 7, 8, 7.2, (d, dx, dy) => {
-      if (d > 0.82) return COL.leafO;
-      if (dx + dy < -0.75) return COL.leafL;
-      if (dx + dy > 0.6) return COL.leafD;
-      return COL.leaf;
-    });
-    for (const [x, y] of [[4, 4], [9, 3], [3, 8], [10, 7], [6, 10]]) { px(g, COL.leafL, x, y, 2, 1); px(g, COL.leafD, x, y + 1, 2, 1); }
+    const N = nb & 1, E = nb & 2, S = nb & 4, Wb = nb & 8;
+    const forestBg = (x, y) => {
+      const cx = x + 0.5, cy = y + 0.5;
+      return (N && cy < 8 && cx > 2 && cx < 14) || (S && cy > 8 && cx > 2 && cx < 14)
+        || (E && cx > 8 && cy > 2 && cy < 14) || (Wb && cx < 8 && cy > 2 && cy < 14)
+        || (N && E && cx > 8 && cy < 8) || (N && Wb && cx < 8 && cy < 8) || (S && E && cx > 8 && cy > 8) || (S && Wb && cx < 8 && cy > 8);
+    };
+    if (!S) {
+      px(g, 'rgba(0,0,0,0.22)', 2, 13, 12, 3);
+      px(g, COL.trunkD, 6, 11, 4, 5); px(g, COL.trunk, 7, 11, 2, 4); px(g, '#8a5a32', 7, 12, 1, 2);
+    }
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (forestBg(x, y)) px(g, COL.leafO, x, y);
+    const cy0 = S ? 8 : 7;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const dx = (x + 0.5 - 8) / 7.8, dy = (y + 0.5 - cy0) / 7.4;
+      const d = dx * dx + dy * dy;
+      if (d > 1) continue;
+      let c;
+      if (d > 0.8) c = COL.leafO;
+      else {
+        const l = dx * 0.7 + dy * 0.8 + (d * 0.25);   // Licht von links oben
+        c = l < -0.55 ? COL.leafL : l < -0.15 ? COL.leafM : l < 0.45 ? COL.leaf : COL.leafD;
+      }
+      px(g, c, x, y);
+    }
+    // ein paar Blätterbüschel als Struktur
+    for (const [x, y] of [[4, 4], [9, 3], [3, 8], [10, 8], [6, 11]]) { px(g, COL.leafL, x, y + (S ? 1 : 0), 2, 1); px(g, COL.leafD, x + 1, y + 1 + (S ? 1 : 0), 2, 1); }
   },
 
   [T.BUSH](g) {
     paintGrass(g, 2);
-    px(g, 'rgba(0,0,0,0.18)', 3, 13, 10, 2);
-    blob(g, 8, 8.5, 6.5, 6, (d, dx, dy) => {
-      if (d > 0.78) return COL.bushO;
-      if (dx + dy < -0.6) return COL.bushL;
-      if (dx + dy > 0.6) return COL.bushD;
-      return COL.bush;
+    px(g, 'rgba(0,0,0,0.2)', 3, 13, 10, 2); px(g, 'rgba(0,0,0,0.12)', 2, 12, 12, 1);
+    blob(g, 8, 8.5, 6.8, 6.2, (d, dx, dy) => {
+      if (d > 0.8) return COL.bushO;
+      const l = dx * 0.7 + dy * 0.8 + d * 0.25;
+      return l < -0.5 ? '#a0e070' : l < -0.1 ? COL.bushL : l < 0.45 ? COL.bush : COL.bushD;
     });
-    for (const [x, y] of [[5, 6], [9, 5], [7, 9], [10, 9]]) px(g, COL.bushL, x, y);
+    for (const [x, y] of [[5, 9], [9, 6], [10, 10]]) { px(g, COL.bushD, x, y, 2, 1); }
+    px(g, '#ffffff', 5, 5); px(g, '#d8ffc0', 6, 5);
   },
 
   [T.ROCK](g) {
