@@ -30,6 +30,7 @@
   #btnA { background: #c8384a; margin-top: -30px; }
   #btnB { background: #3a58c8; margin-top: 30px; }
   .btn.small { width: 48px; height: 48px; font: 22px system-ui, sans-serif; background: #4a5068; margin-top: 50px; }
+  #btnM { position: fixed; top: 10px; right: 10px; margin: 0; width: 44px; height: 44px; font-size: 20px; opacity: .8; }
   .btn.on { filter: brightness(1.4); }
 </style>
 </head>
@@ -38,6 +39,7 @@
   <canvas id="screen" tabindex="0"></canvas>
   <div id="touch">
     <div id="dpad"><div class="arm h"></div><div class="arm v"></div></div>
+    <div class="btn small" id="btnM" title="Menü">&#9776;</div>
     <div id="btns"><div class="btn small" id="btnS">&#8644;</div><div class="btn" id="btnB">B</div><div class="btn" id="btnA">A</div></div>
   </div>
 </div>

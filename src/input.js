@@ -7,18 +7,19 @@ const KEYMAP = {
   Space: 'a', Enter: 'a', KeyE: 'a',
   KeyJ: 'b', KeyK: 'b', KeyX: 'b',
   KeyQ: 'swap', Tab: 'swap',
+  Escape: 'menu', KeyP: 'menu',
 };
 
 const kb = {};
 const tc = {};
 const latched = {}; // kurze Drücke merken, auch wenn sie zwischen zwei Frames wieder losgelassen werden
-let prevA = false, prevB = false, prevS = false;
+let prevA = false, prevB = false, prevS = false, prevM = false;
 let onGesture = () => {};
 
 export const input = {
   dir: { x: 0, y: 0 },
   a: false, b: false,
-  aPressed: false, bPressed: false, swapPressed: false,
+  aPressed: false, bPressed: false, swapPressed: false, menuPressed: false,
   tapY: 0, // kurzer Tipp hoch/runter (für Menüs), auch wenn zwischen zwei Frames losgelassen
   device: 'keyboard',
 };
@@ -76,7 +77,7 @@ function setupTouch() {
   dpad.addEventListener('pointerup', clear);
   dpad.addEventListener('pointercancel', clear);
 
-  for (const [id, k] of [['btnA', 'a'], ['btnB', 'b'], ['btnS', 'swap']]) {
+  for (const [id, k] of [['btnA', 'a'], ['btnB', 'b'], ['btnS', 'swap'], ['btnM', 'menu']]) {
     const el = document.getElementById(id);
     const up = () => { tc[k] = false; el.classList.remove('on'); };
     el.addEventListener('pointerdown', (e) => {
@@ -100,7 +101,8 @@ function readGamepads() {
     if (ay > 0.5 || b(13)) gp.down = true;
     if (ax < -0.5 || b(14)) gp.left = true;
     if (ax > 0.5 || b(15)) gp.right = true;
-    if (b(0) || b(9)) gp.a = true;     // unten (A/Kreuz) oder Start
+    if (b(0)) gp.a = true;             // unten (A/Kreuz)
+    if (b(9) || b(8)) gp.menu = true;  // Start / Select: Pause-Menü
     if (b(1) || b(2)) gp.b = true;     // rechts oder links (B/X)
     if (b(3) || b(4) || b(5)) gp.swap = true; // Y, L, R: Anführer wechseln
   }
@@ -120,8 +122,11 @@ export function pollInput() {
   const swap = held('swap');
   input.swapPressed = (swap && !prevS) || !!latched.swap;
   prevS = swap;
+  const menu = held('menu');
+  input.menuPressed = (menu && !prevM) || !!latched.menu;
+  prevM = menu;
   input.tapY = latched.up ? -1 : latched.down ? 1 : 0;
-  latched.a = latched.b = latched.swap = latched.up = latched.down = false;
+  latched.a = latched.b = latched.swap = latched.up = latched.down = latched.menu = false;
   if (input.aPressed || input.bPressed) onGesture();
   prevA = input.a;
   prevB = input.b;

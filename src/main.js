@@ -11,9 +11,9 @@ import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, create
 import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite } from './sprites.js';
 import { createNPCs, talkTo, arneDoor, LEVER_DIALOG, HEROES, questHint, ABILITY_NAME } from './npcs.js';
 import { Dialog } from './dialog.js';
-import { QuizUI, ShopUI, RiddleUI } from './ui.js';
+import { QuizUI, ShopUI, RiddleUI, PauseUI } from './ui.js';
 import * as HW from './halloween.js';
-import { saveGame, loadGame } from './save.js';
+import { saveGame, loadGame, saveSlot, loadSlot, encodeCode, decodeCode, snapshot } from './save.js';
 
 const W = 240, H = 160;
 const FONT = '"Press Start 2P", monospace';
@@ -292,6 +292,11 @@ function update(dt) {
 
   if (game.state === 'title') {
     game.titleT += dt;
+    if (game.ui) {
+      game.ui.update(input, dt, tp);
+      if (game.ui && game.ui.closed) game.ui = null;
+      return;
+    }
     const items = game.titleCache || (game.titleCache = titleItems());
     const my = input.dir.y || input.tapY;
     if (my && !game.menuHeld) { game.menu = (game.menu + my + items.length) % items.length; sfx.blip(); }
@@ -327,9 +332,12 @@ function update(dt) {
     return;
   }
 
+  if (input.menuPressed && !game.ui && !dialog.active) { sfx.confirm(); openPause(); return; }
+
   if (game.ui) {
     game.ui.update(input, dt, tp);
-    if (game.ui.closed) { game.ui = null; save(); }
+    // Nach dem Laden ist "game" ein neues Objekt – dann gibt es kein offenes Menü mehr
+    if (game.ui && game.ui.closed) { game.ui = null; save(); }
     return;
   }
 
@@ -356,14 +364,67 @@ function update(dt) {
 }
 
 function titleItems() {
-  const s = loadGame();
   const items = [];
-  if (s) items.push({ id: 'continue', label: 'Weiterspielen' });
+  if (loadGame()) items.push({ id: 'continue', label: 'Weiterspielen' });
+  items.push({ id: 'load', label: 'Laden / Code' });
   items.push({ id: 'new', label: 'Neues Spiel' });
   return items;
 }
 
+// --- Speichern & Laden (Pause-Menü) ------------------------------------------------
+
+const PAUSE_API = {
+  save: (n) => saveSlot(game, n),
+  load: (n) => {
+    const d = n === 0 ? loadGame() : loadSlot(n);
+    if (!d) return false;
+    applySave(d);
+    fx.toast(`Spielstand geladen! ${game.diamonds} Diamanten.`, 2.5);
+    return true;
+  },
+  slots: () => [loadGame(), loadSlot(1), loadSlot(2), loadSlot(3)],
+  code: () => encodeCode(snapshot(game)),
+  enterCode() {
+    let input;
+    try { input = window.prompt('Speichercode eingeben (16 Zeichen):'); } catch { input = null; }
+    if (input == null) return { ok: false, text: 'Eingabe hier nicht möglich? Spiel direkt öffnen.' };
+    const d = decodeCode(input);
+    if (!d) { sfx.bump(); return { ok: false, text: 'Der Code stimmt nicht. Bitte genau prüfen!' }; }
+    applySave(fromCode(d));
+    sfx.start();
+    fx.toast('Speichercode geladen!', 2.5);
+    return { ok: true, text: '' };
+  },
+  toTitle() { save(); newGame(); dialog.active = false; },
+};
+
+// Aus den Werten eines Speichercodes einen vollständigen Spielstand bauen
+function fromCode(c) {
+  const party = ['theo'];
+  if (c.step >= 2) party.push('felix');
+  if (c.step >= 3) party.push('arne');
+  if (c.step >= 6) party.push('friedrich');
+  const maxHearts = Math.min(12, 2 + c.level + (c.owned.heart || 0));
+  const pos = {
+    village: c.step >= 7 ? { x: 15 * TILE + 8, y: 3 * TILE, dir: 0 } : { x: 10 * TILE, y: 8 * TILE, dir: 0 },
+    cave: CAVE_SPAWN, haunted: HAUNT_SPAWN,
+  }[c.mapId];
+  const dugCells = [];
+  if (c.cave.dug) dugCells.push('15,17');
+  if (c.cave.secret) dugCells.push('11,19');
+  return {
+    v: 1, mapId: c.mapId, x: pos.x, y: pos.y, dir: pos.dir, party,
+    stats: { level: c.level, xp: c.xp, maxHearts, hearts: maxHearts },
+    step: c.step, owned: c.owned, diamonds: c.diamonds, ammo: c.ammo, hasCloak: c.hasCloak,
+    cave: { ...c.cave, taken: [], dugCells }, haunt: { ...c.haunt, taken: [] },
+    quizIntro: true, seenHints: {},
+  };
+}
+
+function openPause(opts) { game.ui = new PauseUI(game, fx, PAUSE_API, opts); }
+
 function startFromTitle(id) {
+  if (id === 'load') { sfx.confirm(); openPause({ fromTitle: true }); return; }
   sfx.start();
   if (id === 'continue') {
     applySave(loadGame());
@@ -1380,6 +1441,7 @@ function render() {
   if (game.state === 'title' || game.state === 'end') {
     g.fillStyle = game.state === 'end' ? `rgba(8,10,24,${Math.min(0.88, game.endT)})` : 'rgba(8,10,24,0.55)';
     g.fillRect(0, 0, W, H);
+    if (game.state === 'title' && game.ui) game.ui.render(g, () => {});
   }
   if (game.fadeT > 0) { g.fillStyle = `rgba(0,0,0,${game.fadeT / 0.35})`; g.fillRect(0, 0, W, H); }
   if (game.faintT > 0) { g.fillStyle = `rgba(0,0,0,${Math.min(0.85, 1.6 - game.faintT)})`; g.fillRect(0, 0, W, H); }
@@ -1387,7 +1449,10 @@ function render() {
   vctx.imageSmoothingEnabled = false;
   vctx.drawImage(low, 0, 0, W * K, H * K);
 
-  if (game.state === 'title') return renderTitle();
+  if (game.state === 'title') {
+    if (game.ui) { game.ui.render(NOOP_CTX, text); return; }
+    return renderTitle();
+  }
   if (game.state === 'end') return renderEnd();
 
   if (game.ui) {
@@ -1439,6 +1504,7 @@ function renderTitle() {
   if (Math.floor(game.time * 2) % 2 === 0) {
     text(isTouch() ? 'Steuerkreuz wählen, A starten' : 'Hoch/Runter wählen, Leertaste/A starten', W / 2, 136, { size: 5, align: 'center', color: '#a8f070' });
   }
+  text(isTouch() ? '☰ oben rechts: Menü' : 'Im Spiel: Esc oder P = Menü (Speichern/Laden)', W / 2, 148, { size: 5, align: 'center', color: '#8898c0' });
 }
 
 function renderEnd() {
@@ -1520,6 +1586,11 @@ async function boot() {
     }
   });
   try { await document.fonts.load(`16px ${FONT}`); } catch { /* Fallback-Schrift */ }
+  const urlCode = new URLSearchParams(location.search).get('code');
+  if (urlCode) {
+    const c = decodeCode(urlCode);
+    if (c) { applySave(fromCode(c)); fx.toast('Speichercode aus dem Link geladen!', 3); }
+  }
   view.focus();
   requestAnimationFrame(loop);
 }

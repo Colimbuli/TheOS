@@ -305,3 +305,104 @@ export class RiddleUI {
     }
   }
 }
+
+// --- Pause-Menü: Speichern, Laden, Speichercode ------------------------------------
+
+const MAP_NAMES = { village: 'Lindental', school: 'Schule', shop: 'Brunos Laden', cave: 'Höhle', haunted: 'Spukhaus' };
+
+function slotLabel(d) {
+  if (!d) return { name: '– leer –', info: '' };
+  const t = new Date(d.savedAt || 0);
+  const pad = (n) => String(n).padStart(2, '0');
+  const when = d.savedAt ? `${pad(t.getDate())}.${pad(t.getMonth() + 1)}. ${pad(t.getHours())}:${pad(t.getMinutes())}` : '';
+  return { name: MAP_NAMES[d.mapId] || d.mapId, info: `LV${d.stats.level}  ${d.diamonds} Dia.  ${when}` };
+}
+
+export class PauseUI {
+  // api: { save(n), load(n) -> bool, slots() -> [auto, s1, s2, s3], code() -> string, enterCode() -> msg, toTitle() }
+  constructor(game, fx, api, { fromTitle = false, mode = 'main' } = {}) {
+    this.game = game; this.fx = fx; this.api = api; this.fromTitle = fromTitle;
+    this.nav = navigator(); this.closed = false; this.msg = null;
+    this.setMode(mode);
+  }
+
+  setMode(mode) {
+    this.mode = mode; this.sel = 0; this.msg = null;
+    if (mode === 'main') {
+      this.items = this.fromTitle
+        ? [['load', 'Spielstand laden'], ['enter', 'Speichercode eingeben'], ['back', 'Zurück']]
+        : [['resume', 'Weiterspielen'], ['save', 'Speichern'], ['load', 'Laden'], ['code', 'Speichercode anzeigen'], ['enter', 'Speichercode eingeben'], ['title', 'Zum Titelbild']];
+    } else if (mode === 'code') {
+      this.codeText = this.api.code();
+      this.items = [['back', 'Zurück']];
+    } else {
+      // save / load: Plätze 1–3, beim Laden zusätzlich der Autosave
+      const s = this.api.slots();
+      this.items = (mode === 'load' ? [['slot0', 'Automatisch', s[0]]] : []).concat(
+        [1, 2, 3].map((n) => [`slot${n}`, `Platz ${n}`, s[n]]), [['back', 'Zurück']]);
+    }
+  }
+
+  choose(id) {
+    if (id === 'resume') { this.closed = true; return; }
+    if (id === 'back') { if (this.mode === 'main') this.closed = true; else this.setMode('main'); return; }
+    if (id === 'save' || id === 'load' || id === 'code') { this.setMode(id); return; }
+    if (id === 'title') { this.closed = true; this.api.toTitle(); return; }
+    if (id === 'enter') { const r = this.api.enterCode(); if (r) this.msg = r; if (r && r.ok) this.closed = true; return; }
+    if (id.startsWith('slot')) {
+      const n = Number(id.slice(4));
+      if (this.mode === 'save') {
+        const ok = this.api.save(n);
+        this.fx.sfx[ok ? 'item' : 'bump']();
+        this.setMode('save');
+        this.msg = ok ? { ok: true, text: `Gespeichert auf Platz ${n}!` } : { ok: false, text: 'Speichern nicht möglich – nutze den Speichercode.' };
+      } else {
+        if (this.api.load(n)) { this.closed = true; this.fx.sfx.start(); } else { this.fx.sfx.bump(); this.msg = { ok: false, text: 'Dieser Platz ist leer.' }; }
+      }
+    }
+  }
+
+  update(input, dt, tap) {
+    const n = this.items.length;
+    const d = this.nav(input, dt);
+    if (d) { this.sel = (this.sel + d + n) % n; this.fx.sfx.blip(); }
+    for (let i = 0; i < n; i++) if (hit(tap, 30, this.rowY(i), 180, 15)) { this.sel = i; input.aPressed = true; }
+    if (input.bPressed || input.menuPressed) { this.choose('back'); return; }
+    if (input.aPressed) this.choose(this.items[this.sel][0]);
+  }
+
+  rowY(i) {
+    if (this.mode === 'code') return 112;
+    const slots = this.mode === 'save' || this.mode === 'load';
+    return 30 + i * (slots ? 21 : 17);
+  }
+
+  render(g, text) {
+    panel(g);
+    diamondsHeader(g, text, this.game);
+    const title = { main: this.fromTitle ? 'Laden' : 'Pause', save: 'Speichern – Platz wählen', load: 'Laden – Platz wählen', code: 'Speichercode' }[this.mode];
+    text(title, 9, 7, { size: 6, color: '#f8d848' });
+    if (this.mode === 'code') {
+      text('Schreib dir diesen Code auf:', W / 2, 30, { size: 6, align: 'center' });
+      g.fillStyle = '#1c2850'; g.fillRect(20, 46, 200, 24);
+      text(this.codeText, W / 2, 53, { size: 10, align: 'center', color: '#88f0ff' });
+      text('Mit dem Code geht es am Anfang', W / 2, 80, { size: 5, align: 'center', color: '#c8d0e8' });
+      text('des aktuellen Ortes weiter.', W / 2, 89, { size: 5, align: 'center', color: '#c8d0e8' });
+    }
+    this.items.forEach(([id, label, data], i) => {
+      const y = this.rowY(i), sel = i === this.sel;
+      const slot = id.startsWith('slot');
+      const h = slot ? 19 : 15;
+      g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(30, y, 180, h);
+      if (sel) { g.fillStyle = '#f8d848'; g.fillRect(30, y, 2, h); }
+      if (slot) {
+        const l = slotLabel(data);
+        text(label, 38, y + 3, { size: 5, color: '#f8d848' });
+        text(l.name, 100, y + 3, { size: 5, color: data ? '#ffffff' : '#7888a8' });
+        if (l.info) text(l.info, 38, y + 11, { size: 5, color: '#a8b8d8' });
+      } else text(label, 40, y + 4, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
+    });
+    if (this.msg) text(this.msg.text, W / 2, 138, { size: 5, align: 'center', color: this.msg.ok ? '#a8f070' : '#ff9090' });
+    text('A: wählen   B/Esc: zurück', W / 2, 150, { size: 5, align: 'center', color: '#8898c0' });
+  }
+}
