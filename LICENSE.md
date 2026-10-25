@@ -1,6 +1,6 @@
 # Lizenz / License
 
-TheOS – "Theo und der Drache vom Buttenberg"
+Buttenberg Adventures (Repository TheOS, früher "Theo und der Drache vom Buttenberg")
 Copyright (C) 2026 Colimbuli
 
 Dieses Programm ist freie Software: Es darf unter den Bedingungen der

@@ -27,9 +27,11 @@ export const T = {
   CLIFF: 28,    // Felsklippe
   CAVEIN: 29,   // Höhleneingang (führt in die Unterwelt)
   CRACK: 30,    // rissiger Fels – Bomben sprengen ihn
+  // Bergpfad
+  CHASM: 31,    // Schlucht – nur Jelly kann darüber springen
 };
 const SOLID = new Set([T.WATER, T.TREE, T.FENCE, T.BUSH, T.ROCK, T.GATE, T.BOULDER, T.DIGFENCE,
-  T.CWALL, T.EWALL, T.LOCKED, T.BARS, T.IWALL, T.RDOOR, T.RGATE, T.CLIFF, T.CRACK]);
+  T.CWALL, T.EWALL, T.LOCKED, T.BARS, T.IWALL, T.RDOOR, T.RGATE, T.CLIFF, T.CRACK, T.CHASM]);
 const FLOORISH = new Set([T.GRASS, T.FLOWER, T.CFLOOR, T.MUSH, T.WOOD]); // hierauf darf ein Fels geschoben werden
 
 // Generischer Kartenbaukasten. Liefert das Kartenobjekt mit Bau-Helfern (b.*).
@@ -154,6 +156,7 @@ function variant(world, tx, ty, t, frame) {
       return (isC(tx, ty - 1) ? 0 : 1) | (isC(tx, ty + 1) ? 0 : 2) | (isC(tx - 1, ty) ? 0 : 4) | (isC(tx + 1, ty) ? 0 : 8) | (hash(tx, ty) % 3) << 4;
     }
     case T.UP: case T.DOWN: return frame;
+    case T.CHASM: return (tl(tx, ty - 1) === T.CHASM ? 1 : 0) | (tl(tx, ty + 1) === T.CHASM ? 2 : 0);
     default: return 0;
   }
 }
@@ -643,6 +646,16 @@ const PAINT = {
     blob(g, 8, 9, 7.6, 6.6, (d, dx, dy) => (d > 0.78 ? (dy < 0 ? '#9a8670' : '#6e5a48') : null) || '#1a120c');
     blob(g, 8, 10, 5.2, 4.4, (d, dx, dy) => (dy < -0.2 ? '#050302' : '#120c08'));
     px(g, '#c8b49a', 4, 3, 3, 1); px(g, '#c8b49a', 10, 3, 2, 1);
+  },
+
+  [T.CHASM](g, v) {
+    PAINT[T.CFLOOR](g, 0);
+    const lip = (v & 1) ? 0 : 3, low = (v & 2) ? 16 : 13;
+    px(g, '#050308', 0, lip, 16, low - lip);
+    px(g, '#140e1c', 0, lip, 16, 2);
+    if (!(v & 1)) { px(g, CAVE.rockL, 0, lip - 1, 16, 1); px(g, CAVE.rockD, 0, lip, 16, 1); }
+    if (!(v & 2)) px(g, CAVE.rockD, 0, low, 16, 1);
+    px(g, '#2a2236', 3, lip + 4, 1, 1); px(g, '#2a2236', 11, lip + 6, 1, 1);
   },
 
   [T.CRACK](g, v) {
@@ -1136,4 +1149,15 @@ export function drawBrazier(g, o, cx, cy, t) {
   px(g, 'rgba(0,0,0,0.3)', X + 3, Y + 13, 10, 3);
   px(g, '#2a2a34', X + 4, Y + 10, 8, 4); px(g, '#5a5a6a', X + 3, Y + 8, 10, 3); px(g, '#8a8a9a', X + 3, Y + 8, 10, 1);
   px(g, '#ff6a20', X + 4, Y + 3 - f, 8, 6); px(g, '#ffc040', X + 6, Y + 4 - f, 4, 4); px(g, '#fff6b0', X + 7, Y + 5 - f, 2, 2);
+}
+
+// Käfig (2 Kacheln breit) – hier halten die Felsmonster Jelly gefangen
+export function drawCage(g, o, cx, cy) {
+  if (o.open) return;
+  const x = o.x * TILE - cx, y = o.y * TILE - cy;
+  px(g, '#3a3040', x + 1, y - 6, 30, 3);
+  px(g, '#8a8098', x + 1, y - 6, 30, 1);
+  for (let i = 0; i < 8; i++) { px(g, '#1a1020', x + 2 + i * 4, y - 3, 2, 19); px(g, '#a8a0b8', x + 2 + i * 4, y - 3, 1, 19); }
+  px(g, '#3a3040', x + 1, y + 15, 30, 2);
+  px(g, '#f0c838', x + 14, y + 6, 4, 4); px(g, '#1a1020', x + 15, y + 7, 2, 2);
 }

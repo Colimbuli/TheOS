@@ -1,18 +1,20 @@
-// TheOS – "Theo und der Drache vom Buttenberg"
+// Buttenberg Adventures (Repo: TheOS)
 // Top-down-Abenteuer im GBA-Stil. Interne Auflösung 240x160, ganzzahlig hochskaliert.
 //
-// Kapitel 1: Dorf Lindental – Gefährten sammeln (Fähigkeiten im Laden kaufen, Diamanten in der Schule)
-// Kapitel 2: Die Höhle im Buttenberg – Kampf, Rätsel mit allen vier Fähigkeiten
+// Kapitel 1: Dorf Lindental – Gefährten sammeln (freie Startfigur; Fähigkeiten im Laden kaufen)
+// Kapitel 2: Die Höhle im Buttenberg · 3: Das Spukhaus · 4: Das Tal der Trolle · 5: Der Bergpfad
 
 import { initInput, pollInput, input, isTouch } from './input.js';
 import { sfx, unlockAudio } from './audio.js';
 import { drawTiles, T, TILE, COL, drawDiamond, TALL, tileCutout } from './world.js';
 import Tilt from './tilt.js';
-import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES, createValley, createUnder, VALLEY_SPAWN } from './maps.js';
-import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite, guardSprite, bomberSprite, bombSprite, rockSprite } from './sprites.js';
-import { createNPCs, talkTo, arneDoor, LEVER_DIALOG, HEROES, questHint, ABILITY_NAME } from './npcs.js';
+import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES, createValley, createUnder, VALLEY_SPAWN, createMountain, createLair, MOUNTAIN_SPAWN, LAIR_SPAWN } from './maps.js';
+import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite, guardSprite, bomberSprite, bombSprite, rockSprite, mtrollSprite, rockmonSprite, rockBossSprite } from './sprites.js';
+import { createNPCs, talkTo, arneDoor, leverDialog, HEROES, questHint, ABILITY_NAME, STARTERS, HOME, THEO_BUSH, theoNPC, allFour } from './npcs.js';
 import { Dialog } from './dialog.js';
-import { QuizUI, ShopUI, RiddleUI, PauseUI, ChapterUI } from './ui.js';
+import { QuizUI, ShopUI, RiddleUI, PauseUI, ChapterUI, StarterUI } from './ui.js';
+import { nextQuestion } from './quiz.js';
+import { mountainQuestion } from './mountain.js';
 import * as HW from './halloween.js';
 import { saveGame, loadGame, saveSlot, loadSlot, encodeCode, decodeCode, snapshot } from './save.js';
 
@@ -41,13 +43,20 @@ const member = (id, x, y, dir = 0) => ({ id, pal: id, x, y, dir, anim: 0, moving
 const leader = () => game.party[0];
 const map = () => game.maps[game.mapId];
 
-function newGame() {
-  const maps = { village: createVillage(), school: createSchool(), shop: createShop(), cave: createCave(), haunted: createHaunted(), valley: createValley(), under: createUnder() };
-  maps.village.npcs = createNPCs();
+function newGame(starter = 'theo') {
+  const maps = { village: createVillage(), school: createSchool(), shop: createShop(), cave: createCave(), haunted: createHaunted(),
+    valley: createValley(), under: createUnder(), mountain: createMountain(), lair: createLair() };
+  maps.village.npcs = createNPCs(starter);
+  if (starter === 'arne') maps.village.setTile(24, 9, T.PATH); // Arne ist schon draußen
+  const h = HOME[starter];
   game = {
     state: 'title', time: 0, titleT: 0, endT: 0, menu: 0,
     maps, mapId: 'village',
-    party: [member('theo', 10 * TILE, 8 * TILE, 0)],
+    party: [member(starter, h.x, h.y, h.dir)],
+    starter, rec: { theo: false, felix: false, arne: false, friedrich: false, [starter]: true },
+    mama: 0, theoFound: false,
+    mtn: { statue: false, wall: false, rocks: false, key: false, boss: false, jelly: false, done: false, taken: [] },
+    jumpT: 0, jump: null, sprintT: 0, sprintCD: 0,
     stats: { hearts: 3, maxHearts: 3, level: 1, xp: 0 },
     step: 0, owned: {}, diamonds: 0, ammo: 0, hasCloak: false,
     cave: { dug: false, boulder: false, key: false, door: false, statue: false, troll: false, lever: false,
@@ -68,24 +77,34 @@ function newGame() {
   spawnEnemies(maps.haunted);
   spawnEnemies(maps.valley);
   spawnEnemies(maps.under);
+  spawnEnemies(maps.mountain);
+  spawnEnemies(maps.lair);
 }
 
 // Gespeicherten Stand auf frisch aufgebaute Karten anwenden
 function applySave(d) {
-  newGame();
+  newGame(d.starter || 'theo');
   Object.assign(game, {
     step: d.step, owned: d.owned || {}, diamonds: d.diamonds, ammo: d.ammo, hasCloak: d.hasCloak,
     stats: d.stats, quizStats: d.quizStats || game.quizStats, quizIntro: d.quizIntro, seenHints: d.seenHints || {},
     checkpoint: d.checkpoint, bushes: d.bushes || 0, treasures: d.treasures || 0, kills: d.kills || 0,
   });
   Object.assign(game.cave, d.cave || {});
+  // Kapitel-1-Fortschritt; alte Spielstände (nur "step") werden umgerechnet
+  const st = d.step || 0;
+  game.rec = { ...game.rec, ...(d.rec || { felix: st >= 2, arne: st >= 3, friedrich: st >= 6 }) };
+  for (const id of d.party) if (game.rec[id] !== undefined) game.rec[id] = true;
+  game.mama = d.mama ?? (st >= 6 ? 2 : st >= 4 ? 1 : 0);
+  game.theoFound = !!d.theoFound;
+  game.step = st >= 7 ? 7 : 0;
   const v = game.maps.village, c = game.maps.cave;
-  if (game.step >= 3) v.setTile(24, 9, T.PATH);
-  if (game.hasCloak || game.step >= 5) v.setTile(7, 16, T.TUNNEL);
-  if (game.hasCloak || game.step >= 6) game.cloak.taken = true;
+  if (game.rec.arne) v.setTile(24, 9, T.PATH);
+  if (game.hasCloak || game.mama === 2) { v.setTile(7, 16, T.TUNNEL); game.cloak.taken = true; }
   if (game.step >= 7) v.openGate();
   game.party = d.party.map((id) => member(id, d.x, d.y, d.dir));
   v.npcs = v.npcs.filter((n) => !d.party.includes(n.id));
+  if (game.theoFound && !game.rec.theo) v.npcs.push(theoNPC());
+  if (d.mtn) { Object.assign(game.mtn, d.mtn); applyMountain(); }
   const cv = game.cave;
   for (const k of cv.dugCells) { const [x, y] = k.split(',').map(Number); c.setTile(x, y, T.CFLOOR); }
   if (cv.boulder) { c.setTile(24, 11, T.CFLOOR); c.setTile(25, 11, T.BOULDER); }
@@ -110,12 +129,13 @@ function applySave(d) {
   game.state = 'play';
 }
 
-const HP = { slime: 2, kobold: 3, bat: 1, guard: 3, bomber: 2, trollboss: 6 };
+const HP = { slime: 2, kobold: 3, bat: 1, guard: 3, bomber: 2, trollboss: 6, mtroll: 3, rockmon: 4, rockboss: 8 };
 
 function spawnEnemies(m) {
   m.enemies = (m.enemySpawns || []).map((s, i) => ({
     id: i, type: s.type, x: s.x * TILE, y: s.y * TILE, hp: HP[s.type], home: { x: s.x * TILE, y: s.y * TILE }, stunT: 0,
     cd: 1 + Math.random() * 1.5, hurtT: 0, alive: true, anim: Math.random() * 3, flip: false, throwT: 0,
+    asleep: !!s.asleep, guard: !!s.guard, mode: 'idle', modeT: 0,
   }));
 }
 
@@ -143,9 +163,9 @@ const fx = {
     game.stats.hearts = game.stats.maxHearts;
   },
   join(id) {
-    const v = game.maps.village;
+    const v = map().npcs.some((n) => n.id === id) ? map() : game.maps.village;
     const i = v.npcs.findIndex((n) => n.id === id);
-    const from = i >= 0 ? v.npcs.splice(i, 1)[0] : leader();
+    const from = i >= 0 && v === map() ? v.npcs.splice(i, 1)[0] : (i >= 0 && v.npcs.splice(i, 1), leader());
     const m = member(id, from.x, from.y, from.dir);
     game.party.push(m);
     poof(m.x + 8, m.y + 10);
@@ -155,6 +175,7 @@ const fx = {
   openQuiz() { game.ui = new QuizUI(game, fx); },
   openShop() { game.ui = new ShopUI(game, fx); },
   openRiddle(id) { openRiddle(id); },
+  jellyTalk() { return jellyTalk(); },
 };
 
 function float(text, x, y, color = '#f8d848') { game.floats.push({ text, x, y, t: 1.1, color }); }
@@ -229,7 +250,8 @@ function goTo(mapId, x, y, dir) {
   game.banners = game.banners.slice(-1);
   if (mapId === 'cave') game.checkpoint = { map: 'cave', ...CAVE_SPAWN };
   if (mapId === 'haunted') game.checkpoint = { map: 'haunted', ...HAUNT_SPAWN };
-  if (mapId === 'valley' || mapId === 'under') game.checkpoint = { map: mapId, x, y, dir };
+  if (['valley', 'under', 'mountain', 'lair'].includes(mapId)) game.checkpoint = { map: mapId, x, y, dir };
+  game.sprintT = 0; game.jumpT = 0;
   save();
 }
 
@@ -328,9 +350,12 @@ function update(dt) {
       } else if (game.endChapter === 3) {
         goTo('valley', VALLEY_SPAWN.x, VALLEY_SPAWN.y, VALLEY_SPAWN.dir);
         fx.banner('KAPITEL 4', 'Das Tal der Trolle', '#ffb040');
+      } else if (game.endChapter === 4) {
+        goTo('mountain', MOUNTAIN_SPAWN.x, MOUNTAIN_SPAWN.y, MOUNTAIN_SPAWN.dir);
+        fx.banner('KAPITEL 5', 'Der Bergpfad', '#ffb040');
       } else {
         const L = leader();
-        L.x = 16 * TILE; L.y = 5 * TILE; L.dir = 0;
+        L.x = 2 * TILE; L.y = 2 * TILE + 4; L.dir = 0;
         regroup();
         save();
       }
@@ -421,14 +446,20 @@ const PAUSE_API = {
 
 // Aus den Werten eines Speichercodes einen vollständigen Spielstand bauen
 function fromCode(c) {
-  const party = ['theo'];
-  if (c.step >= 2) party.push('felix');
-  if (c.step >= 3) party.push('arne');
-  if (c.step >= 6) party.push('friedrich');
+  const starter = c.starter || 'theo';
+  const rec = { ...(c.rec || {}) };
+  if (c.step >= 2) rec.felix = true;
+  if (c.step >= 3) rec.arne = true;
+  if (c.step >= 6) { rec.friedrich = true; rec.theo = true; }
+  rec[starter] = true;
+  const mama = c.step >= 6 || c.mama ? 2 : 0;
+  const party = [starter, ...STARTERS.filter((id) => id !== starter && rec[id])];
+  if (c.mtn && c.mtn.jelly) party.push('jelly');
   const maxHearts = Math.min(12, 2 + c.level + (c.owned.heart || 0));
   const pos = {
-    village: c.step >= 7 ? { x: 15 * TILE + 8, y: 3 * TILE, dir: 0 } : { x: 10 * TILE, y: 8 * TILE, dir: 0 },
+    village: c.step >= 7 ? { x: 15 * TILE + 8, y: 3 * TILE, dir: 0 } : HOME[starter],
     cave: CAVE_SPAWN, haunted: HAUNT_SPAWN, valley: VALLEY_SPAWN, under: { x: 25 * TILE, y: 18 * TILE, dir: 2 },
+    mountain: MOUNTAIN_SPAWN, lair: LAIR_SPAWN,
   }[c.mapId];
   const dugCells = [];
   if (c.cave.dug) dugCells.push('15,17');
@@ -439,7 +470,9 @@ function fromCode(c) {
     step: c.step, owned: c.owned, diamonds: c.diamonds, ammo: c.ammo, hasCloak: c.hasCloak,
     cave: { ...c.cave, taken: [], dugCells }, haunt: { ...c.haunt, taken: [] },
     valley: { ...(c.valley || {}), edits: [], taken: [] },
-    quizIntro: true, seenHints: {},
+    mtn: { ...(c.mtn || {}), taken: [] },
+    starter, rec, mama, hasCloak: c.hasCloak || mama === 2,
+    quizIntro: true, seenHints: { felixTalk: true },
   };
 }
 
@@ -459,11 +492,12 @@ export const CHAPTERS = [
   { n: 2, name: 'Die Höhle im Buttenberg' },
   { n: 3, name: 'Das Spukhaus' },
   { n: 4, name: 'Das Tal der Trolle' },
+  { n: 5, name: 'Der Bergpfad' },
 ];
 
 // Startet ein Kapitel mit allem, was man bis dahin normalerweise hätte
-function startChapter(n) {
-  if (n === 1) { newGame(); startFromTitle('new'); return; }
+function startChapter(n, starter = 'theo') {
+  if (n === 1) { beginNew(starter); return; }
   const allBasic = { shield: true, strength: true, dig: true, invis: true, sling: true, shovel: true };
   const caveDone = { dug: true, boulder: true, key: true, door: true, statue: true, troll: true, lever: true, secret: false, done: true };
   const hauntDone = { gate: true, front: true, count: true, chest: true, lib: true, candles: true, king: true, door6: true, done: true, target: 19 };
@@ -471,9 +505,11 @@ function startChapter(n) {
     2: { mapId: 'cave', level: 4, diamonds: 20, cave: {}, haunt: { target: 19 } },
     3: { mapId: 'haunted', level: 6, diamonds: 25, cave: caveDone, haunt: { target: 5 + Math.floor(Math.random() * 27) } },
     4: { mapId: 'valley', level: 7, diamonds: 30, cave: caveDone, haunt: hauntDone },
+    5: { mapId: 'mountain', level: 9, diamonds: 35, cave: caveDone, haunt: hauntDone, owned: { ...allBasic, sword: true, shield2: true },
+      valley: { sword: true, key: true, lever: true, door: true, troll: true, done: true } },
   }[n];
-  newGame();
-  applySave(fromCode({ step: 7, hasCloak: true, owned: allBasic, ammo: 30, xp: 0, valley: {}, ...preset }));
+  newGame(starter);
+  applySave(fromCode({ step: 7, hasCloak: true, owned: allBasic, ammo: 30, xp: 0, valley: {}, starter, ...preset }));
   game.titleCache = null;
   sfx.start();
   const c = CHAPTERS[n - 1];
@@ -481,23 +517,47 @@ function startChapter(n) {
   save();
 }
 
+// Erst Kapitel, dann Startfigur wählen
+function pickStarter(then) {
+  game.ui = new StarterUI(game, fx, then);
+}
+
 function startFromTitle(id) {
   if (id === 'load') { sfx.confirm(); openPause({ fromTitle: true }); return; }
-  if (id === 'chapters') { sfx.confirm(); game.ui = new ChapterUI(game, fx, CHAPTERS, startChapter); return; }
+  if (id === 'chapters') {
+    sfx.confirm();
+    game.ui = new ChapterUI(game, fx, CHAPTERS, (n) => pickStarter((st) => startChapter(n, st)));
+    return;
+  }
+  if (id === 'new') { sfx.confirm(); pickStarter(beginNew); return; }
   sfx.start();
   if (id === 'continue') {
     applySave(loadGame());
     fx.toast(`Willkommen zurück! Du hast ${game.diamonds} Diamanten.`, 3);
-    return;
   }
+}
+
+const OTHERS_TEXT = {
+  theo: 'Theo muss Felix und Arne überzeugen – und Mama, damit sein kleiner Bruder Friedrich mitdarf.',
+  felix: 'Felix muss Theo und Arne überzeugen – und Theos Mama, damit Friedrich mitdarf.',
+  arne: 'Arne muss Theo und Felix überzeugen – und Theos Mama, damit Friedrich mitdarf.',
+  friedrich: 'Friedrich muss Theo, Felix und Arne überzeugen – und Mama, damit er überhaupt mitdarf!',
+};
+
+function beginNew(starter) {
+  newGame(starter);
+  sfx.start();
   game.state = 'play';
   game.mapId = 'village';
+  const name = HEROES[starter].name;
   dialog.open([
-    'Ein sonniger Morgen in Lindental. Theo hat einen großen Plan:',
-    'Der böse Drache am Buttenberg muss besiegt werden! Aber dafür braucht er Freunde – und Fähigkeiten.',
+    `Ein sonniger Morgen in Lindental. ${name} hat einen großen Plan:`,
+    'Der böse Drache am Buttenberg muss besiegt werden! Aber dafür braucht es Freunde – und Fähigkeiten.',
+    OTHERS_TEXT[starter],
     'Fähigkeiten gibt es in Brunos Laden. Bezahlt wird mit Diamanten – die verdienst du in der Schule!',
     'Schule und Laden sind im Süden des Dorfes. Laufen: Pfeile/WASD. Reden: Leertaste oder A. Fähigkeit: J oder B.',
   ]);
+  save();
 }
 
 function updateTimers(dt) {
@@ -505,6 +565,8 @@ function updateTimers(dt) {
   game.shieldCD = Math.max(0, game.shieldCD - dt);
   game.hurtT = Math.max(0, game.hurtT - dt);
   game.swingT = Math.max(0, game.swingT - dt);
+  game.sprintT = Math.max(0, game.sprintT - dt);
+  game.sprintCD = Math.max(0, game.sprintCD - dt);
   if (game.toast && (game.toast.t -= dt) <= 0) game.toast = null;
   if (game.invisT > 0) {
     game.invisT -= dt;
@@ -514,6 +576,7 @@ function updateTimers(dt) {
 
 function updateLeader(dt) {
   const L = leader();
+  if (game.jumpT > 0) { updateJump(L, dt); return; }
   if (game.actT > 0) { game.actT -= dt; L.moving = false; return; }
   if (input.swapPressed) { switchLeader(); return; }
   if (input.bPressed) { useAbility(); return; }
@@ -529,7 +592,7 @@ function updateLeader(dt) {
       if (L.dir !== h && L.dir !== v) L.dir = v;
     }
     const len = Math.hypot(ix, iy);
-    const sp = SPEED * dt * (game.shieldT > 0 ? 0.6 : 1);
+    const sp = SPEED * dt * (game.shieldT > 0 ? 0.6 : game.sprintT > 0 ? 1.9 : 1);
     if (move(L, (ix / len) * sp, (iy / len) * sp, true)) {
       L.moving = true;
       L.anim += dt;
@@ -578,13 +641,29 @@ function interact() {
       return;
     }
   }
-  if (m.id === 'village' && tx === 24 && ty === 7 && game.step === 2) { open(arneDoor(game, fx)); return; }
+  if (m.id === 'village' && tx === 24 && ty === 7 && !game.rec.arne && m.tile(24, 9) !== T.BOULDER) { open(arneDoor(game, fx)); return; }
+  if (m.id === 'village' && m.tile(tx, ty) === T.BUSH && theoHiding()) {
+    if (tx === THEO_BUSH.x && ty === THEO_BUSH.y) revealTheo();
+    else { sfx.bump(); float('Raschel ...', tx * TILE + 8, ty * TILE - 4, '#ffffff'); fx.toast('Hier versteckt sich niemand.', 1.5); }
+    return;
+  }
+  if (m.id === 'lair' && m.cage && !m.cage.open && ty === 3 && (tx === 12 || tx === 13)) { open(jellyTalk()); return; }
 
   const text = m.textAt(tx, ty);
   if (text) { dialog.open(text); return; }
   const t = m.tile(tx, ty);
   if (t === T.GATE) dialog.open(['Das Tor zum Buttenberg ist fest verschlossen.', 'Der Hebel dafür ist gleich daneben – direkt vor Konrads Nase.']);
   else if (t === T.BOULDER) dialog.open(['Ein riesiger Felsbrocken. Dafür braucht man Felix\' Superstärke!']);
+  else if (t === T.CHASM) dialog.open(game.party.some((p) => p.id === 'jelly')
+    ? ['Eine tiefe Schlucht! Jelly nach vorne holen und mit B hinüberspringen – die anderen klettern hinterher.']
+    : ['Eine tiefe Schlucht! Viel zu breit für Kinder ... Nur wer richtig gut springen kann, kommt hier rüber.']);
+  else if (t === T.LOCKED && m.id === 'lair') {
+    if (game.mtn.key) {
+      m.setTile(tx, ty, T.CFLOOR);
+      sfx.door();
+      fx.toast('Der Schlüssel aus der Bergkammer passt!', 3);
+    } else dialog.open(['Eine verschlossene Felsentür. Den Schlüssel haben die Bergtrolle bestimmt irgendwo am Pfad versteckt.']);
+  }
   else if (t === T.DIG || t === T.EWALL) dialog.open(['Lockere Erde. Hier könnte Arne graben...']);
   else if (t === T.LOCKED && m.id === 'valley') {
     if (game.valley.key) {
@@ -634,8 +713,12 @@ function pullLever() {
     save();
     return;
   }
+  if (!allFour(game) || game.mama < 2) {
+    dialog.open([`${HEROES[leader().id].name}: Psst! Noch nicht – erst müssen alle vier dabei sein.`, `Quest: ${questHint(game).replace(/^Quest: /, '')}`]);
+    return;
+  }
   open({
-    lines: LEVER_DIALOG,
+    lines: leverDialog(game),
     after() {
       m.openGate();
       game.step = 7;
@@ -700,6 +783,26 @@ function useAbility() {
       game.actT = 0.3; sfx.bump(); float('Zu hart!', L.x + 8, L.y - 6, '#ffb0b0');
       return;
 
+    case 'jelly': {
+      const [dx, dy] = DIRV[L.dir];
+      const t1 = m.tile(tx, ty);
+      const lx = L.x + dx * 32, ly = L.y + dy * 32;
+      if (t1 === T.CHASM && !wallHit(lx, ly)) {
+        game.jumpT = 0.45;
+        game.jump = { x0: L.x, y0: L.y, x1: lx, y1: ly };
+        sfx.swing();
+        float('Hopp!', L.x + 8, L.y - 6, '#ffffff');
+        return;
+      }
+      if (t1 === T.CHASM) { sfx.bump(); float('Zu weit!', L.x + 8, L.y - 6, '#ffb0b0'); return; }
+      if (game.sprintCD > 0) return;
+      game.sprintT = 1.4;
+      game.sprintCD = 2.2;
+      sfx.swap();
+      float('Sprint!', L.x + 8, L.y - 6, '#88f0ff');
+      return;
+    }
+
     case 'friedrich':
       if (!o.invis) return needBuy('invis');
       if (game.invisT > 0) { endInvisibility(); return; }
@@ -730,6 +833,7 @@ function felixStrength(L, tx, ty, t) {
       float('Hau-Ruck!', L.x + 8, L.y - 6, '#ffffff');
       if (m.id === 'cave' && !game.cave.boulder) { game.cave.boulder = true; fx.gainXP(5); save(); }
       if (m.id === 'haunted' && !game.haunt.chest) { game.haunt.chest = true; fx.gainXP(5); save(); }
+      if (m.id === 'mountain' && !game.mtn.rocks) { game.mtn.rocks = true; fx.gainXP(5); save(); }
       if (m.id === 'valley' || m.id === 'under') {
         game.valley.edits.push([m.id, tx, ty, m.tile(tx, ty)], [m.id, tx + dx, ty + dy, T.BOULDER]);
         fx.gainXP(3);
@@ -739,6 +843,7 @@ function felixStrength(L, tx, ty, t) {
     return;
   }
   m.setTile(tx, ty, T.GRASS);
+  if (m.id === 'village' && tx === THEO_BUSH.x && ty === THEO_BUSH.y && theoHiding()) revealTheo();
   game.bushes++;
   sfx.push();
   burst(tx * TILE + 8, ty * TILE + 8, [COL.bush, COL.bushL]);
@@ -752,7 +857,11 @@ function arneDig(L, tx, ty, t) {
   game.actT = 0.3;
   const m = map();
   sfx.dig();
-  if (t === T.DIG) {
+  if (t === T.DIG && m.id === 'mountain') {
+    m.setTile(tx, ty, T.HOLE);
+    burst(tx * TILE + 8, ty * TILE + 8, DIRT);
+    float('Eine Falle!', tx * TILE + 8, ty * TILE - 6, '#ffffff');
+  } else if (t === T.DIG) {
     m.setTile(tx, ty, T.HOLE);
     burst(tx * TILE + 8, ty * TILE + 8, DIRT);
     // Manchmal steckt ein Diamant in der Erde
@@ -765,6 +874,13 @@ function arneDig(L, tx, ty, t) {
     burst(tx * TILE + 8, ty * TILE + 12, DIRT, 14);
     float('Tunnel!', tx * TILE + 8, ty * TILE - 6, '#ffffff');
     fx.gainXP(5);
+  } else if (t === T.EWALL && m.id === 'mountain') {
+    m.setTile(tx, ty, T.GRASS);
+    game.mtn.wall = true;
+    burst(tx * TILE + 8, ty * TILE + 10, DIRT, 16);
+    float('Durchgebuddelt!', tx * TILE + 8, ty * TILE - 6, '#ffffff');
+    fx.gainXP(5);
+    save();
   } else if (t === T.EWALL && m.id !== 'cave') {
     editTile(m, tx, ty, T.CFLOOR);
     burst(tx * TILE + 8, ty * TILE + 10, DIRT, 16);
@@ -788,9 +904,11 @@ function arneDig(L, tx, ty, t) {
   }
 }
 
+const BIG = new Set(['trollboss', 'rockboss']);
+
 function enemyInFront(L) {
   const f = frontPoint(L, 11);
-  return map().enemies.some((e) => e.alive && Math.hypot(e.x + 8 - f.x, e.y + 10 - f.y) < (e.type === 'trollboss' ? 22 : 17));
+  return map().enemies.some((e) => e.alive && Math.hypot(e.x + 8 - f.x, e.y + 10 - f.y) < (BIG.has(e.type) ? 22 : 17));
 }
 
 function swordSwing(L) {
@@ -801,7 +919,7 @@ function swordSwing(L) {
   const f = frontPoint(L, 12);
   const [dx, dy] = DIRV[L.dir];
   for (const e of map().enemies) {
-    if (e.alive && Math.hypot(e.x + 8 - f.x, e.y + 10 - f.y) < (e.type === 'trollboss' ? 24 : 18)) damageEnemy(e, 2, dx * 12, dy * 12, 'sword');
+    if (e.alive && Math.hypot(e.x + 8 - f.x, e.y + 10 - f.y) < (BIG.has(e.type) ? 24 : 18)) damageEnemy(e, 2, dx * 12, dy * 12, 'sword');
   }
 }
 
@@ -829,7 +947,7 @@ function hurt(n) {
   game.hurtT = 1;
   sfx.hurt();
   if (st.hearts > 0 || game.challenge.active) return;
-  if (['cave', 'haunted', 'valley', 'under'].includes(game.mapId)) {
+  if (['cave', 'haunted', 'valley', 'under', 'mountain', 'lair'].includes(game.mapId)) {
     st.hearts = 0;
     game.faintT = 1.6;
     game.invisT = 0;
@@ -839,7 +957,7 @@ function hurt(n) {
 
 function respawn() {
   let cp = game.checkpoint;
-  if (!cp || cp.map !== game.mapId) cp = { haunted: HAUNT_SPAWN, valley: VALLEY_SPAWN }[game.mapId] || CAVE_SPAWN;
+  if (!cp || cp.map !== game.mapId) cp = { haunted: HAUNT_SPAWN, valley: VALLEY_SPAWN, mountain: MOUNTAIN_SPAWN, lair: LAIR_SPAWN }[game.mapId] || CAVE_SPAWN;
   const L = leader();
   L.x = cp.x; L.y = cp.y; L.dir = cp.dir;
   regroup();
@@ -855,6 +973,24 @@ function damageEnemy(e, dmg, kx = 0, ky = 0, src = 'nut') {
     float('Kling!', e.x + 8, e.y - 4, '#c8c8d8');
     if (!game.seenHints.armor) { game.seenHints.armor = true; fx.toast('Die Rüstung ist zu hart! Nur ein Schwert hilft – im Tal liegt ein Schatz ...', 4); }
     return;
+  }
+  if (e.type === 'rockmon') {
+    if (e.asleep) wake(e);
+    if (src === 'nut') {
+      sfx.clang();
+      float('Kling!', e.x + 8, e.y - 4, '#c8c8d8');
+      if (!game.seenHints.stone) { game.seenHints.stone = true; fx.toast('Kastanien prallen vom Stein ab! Schwert oder Schaufel helfen.', 3); }
+      return;
+    }
+  }
+  if (e.type === 'rockboss') {
+    if (e.mode !== 'stuck') {
+      sfx.clang();
+      float('HARR!', e.x + 8, e.y - 20, '#ffb0b0');
+      if (!game.seenHints.boss) { game.seenHints.boss = true; fx.toast('Zu hart! Lockt das Felsmonster in ein Loch, das Arne gräbt.', 3.5); }
+      return;
+    }
+    dmg = src === 'sword' ? 2 : 1;
   }
   if (e.type === 'trollboss') {
     if (src === 'rock' || src === 'bomb') {
@@ -872,11 +1008,15 @@ function damageEnemy(e, dmg, kx = 0, ky = 0, src = 'nut') {
   moveEnemy(e, kx, ky);
   if (e.hp > 0) { sfx.hit(); return; }
   if (e.type === 'trollboss') { trollDefeated(e); return; }
+  if (e.type === 'rockboss') { rockBossDefeated(e); return; }
   e.alive = false;
   game.kills++;
   sfx.pop();
   burst(e.x + 8, e.y + 8, CONFETTI, 18, 60);
-  fx.gainXP({ slime: 3, kobold: 6, bat: 2, guard: 6, bomber: 5 }[e.type] || 3, e.x + 8, e.y);
+  fx.gainXP({ slime: 3, kobold: 6, bat: 2, guard: 6, bomber: 5, mtroll: 5, rockmon: 6 }[e.type] || 3, e.x + 8, e.y);
+  if (e.guard && map().enemies.filter((x) => x.guard && x.alive).length === 0) {
+    fx.toast('Die Wächter sind besiegt! Schnell zum Käfig!', 3);
+  }
   if (e.type === 'kobold' && Math.random() < 0.6) {
     map().items.push({ id: `drop${game.dropN++}`, type: 'bag', x: e.x + 2, y: e.y + 2, taken: false, drop: true });
   }
@@ -934,6 +1074,21 @@ function updateEnemies(dt) {
         }
       }
       if (e.stunT > 0) continue; // benommen: keine Berührungsschäden
+    } else if (e.type === 'rockboss') {
+      updateRockBoss(e, dt, L, nx, ny, d);
+      continue;
+    } else if (e.type === 'rockmon') {
+      if (e.asleep) {
+        if (visible && d < (game.sprintT > 0 ? 44 : 26)) wake(e);
+        continue; // schlafend: keine Berührungsschäden
+      }
+      e.flip = dx < 0;
+      if (sees && (!e.guard || d < 90)) moveEnemy(e, nx * (e.guard ? 20 : 24) * dt, ny * (e.guard ? 20 : 24) * dt);
+      else if (e.guard) moveEnemy(e, Math.sign(e.home.x - e.x) * 12 * dt, Math.sign(e.home.y - e.y) * 12 * dt);
+    } else if (e.type === 'mtroll') {
+      e.flip = dx < 0;
+      if (sees && d < 80) moveEnemy(e, nx * 28 * dt, ny * 28 * dt);
+      else moveEnemy(e, Math.cos(e.anim * 0.8 + e.id) * 12 * dt, Math.sin(e.anim * 0.6 + e.id) * 8 * dt);
     } else if (e.type === 'bat') {
       const wob = Math.sin(e.anim * 5 + e.id) * 30;
       if (sees && d < 90) moveEnemy(e, (nx * 38 - ny * wob * 0.5) * dt, (ny * 38 + nx * wob * 0.5) * dt);
@@ -1026,7 +1181,7 @@ function updateProjectiles(dt) {
       p.t = 0;
       if (p.kind === 'fire') {
         m.killStatue();
-        game.cave.statue = true;
+        if (m.id === 'mountain') game.mtn.statue = true; else game.cave.statue = true;
         sfx.pop();
         burst(p.x, p.y, ['#8a8078', '#ff9a20', '#6e665e', '#ffd060'], 26, 70);
         fx.banner('STATUE ZERSTÖRT!', 'Theo hat das Feuer zurückgeworfen', '#a8f070');
@@ -1045,8 +1200,8 @@ function updateProjectiles(dt) {
         const shield = L.id === 'theo' && game.shieldT > 0;
         if (p.challenge) {
           p.t = 0;
-          if (shield) { game.challenge.blocked++; sfx.block(); burst(p.x, p.y, ['#a8e8ff', '#ffffff'], 6, 40); fx.gainXP(2, L.x + 8, L.y - 4); }
-          else hurt(1);
+          if (shield) { sfx.block(); burst(p.x, p.y, ['#a8e8ff', '#ffffff'], 6, 40); fx.gainXP(2, L.x + 8, L.y - 4); }
+          else { p.hitPlayer = true; hurt(1); }
         } else if (shield) {
           p.vx *= -1.5; p.vy *= -1.5; p.owner = 'player'; p.reflected = true; p.t = 3;
           sfx.block();
@@ -1070,6 +1225,8 @@ function updateProjectiles(dt) {
       fx.toast('Troll: HOHOHO! Das kitzelt!', 2);
     }
   }
+  // Kastanienprobe: jede Kastanie, die nicht getroffen hat, zählt (abgewehrt oder ausgewichen)
+  for (const p of game.projectiles) if (p.challenge && p.t <= 0 && !p.hitPlayer && game.challenge.active) game.challenge.blocked++;
   game.projectiles = game.projectiles.filter((p) => p.t > 0);
 }
 
@@ -1134,13 +1291,13 @@ function updateChallenge(dt) {
     game.projectiles = [];
     open({
       lines: [
-        'Felix: Wow! Fünf Stück – du bist echt mutig!',
+        'Felix: Wow! Fünf Stück – und kein einziger Treffer. Du bist echt mutig!',
         'Felix: Okay, ich bin dabei. Mit Superstärke schieb ich jeden Felsen weg! Die gibt\'s bei Bruno.',
         'Tipp: Mit Q (Tastatur), L/R (Gamepad) oder dem Pfeil-Knopf wechselst du, wer vorne läuft.',
       ],
       after() {
+        game.rec.felix = true;
         fx.join('felix');
-        game.step = 2;
         sfx.item();
         fx.banner('FELIX IST DABEI', 'Fähigkeit: Superstärke (Laden)', '#a8f070');
         fx.gainXP(15);
@@ -1164,7 +1321,7 @@ function checkPickups() {
     if (!c.taken && overlap(L.x + 3, L.y + 8, 10, 7, c.x, c.y, 12, 10)) {
       c.taken = true;
       game.hasCloak = true;
-      if (game.step === 4) game.step = 5;
+      if (!game.mama) game.mama = 1;
       sfx.item();
       poof(c.x + 6, c.y + 4);
       fx.banner('TARNUMHANG GEFUNDEN', 'Bring ihn zu Mama', '#88e0ff');
@@ -1177,7 +1334,7 @@ function checkPickups() {
     const st = game.stats;
     if (it.type === 'apple' && st.hearts >= st.maxHearts) continue;
     it.taken = true;
-    if (!it.drop) ({ haunted: game.haunt.taken, valley: game.valley.taken, under: game.valley.taken }[m.id] || game.cave.taken).push(it.id);
+    if (!it.drop) ({ haunted: game.haunt.taken, valley: game.valley.taken, under: game.valley.taken, mountain: game.mtn.taken, lair: game.mtn.taken }[m.id] || game.cave.taken).push(it.id);
     sfx.item();
     switch (it.type) {
       case 'crystal': game.diamonds += 2; fx.toast('Ein Kristall! +2 Diamanten', 2.5); break;
@@ -1187,7 +1344,8 @@ function checkPickups() {
         game.ammo += 10;
         fx.toast(game.owned.sling ? '+10 Kastanien für Felix!' : '+10 Kastanien – mit einer Schleuder könnte Felix sie werfen.', 3);
         break;
-      case 'key': if (m.id === 'under') { game.valley.key = true; fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in die Felsentür im Tal', '#f8d848'); break; }
+      case 'key': if (m.id === 'mountain') { game.mtn.key = true; fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in eine Tür ganz oben am Berg', '#f8d848'); break; }
+        if (m.id === 'under') { game.valley.key = true; fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in die Felsentür im Tal', '#f8d848'); break; }
         game.cave.key = true; fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in die Schlosstür in der Halle', '#f8d848'); break;
     }
     save();
@@ -1233,8 +1391,23 @@ function checkWarps() {
   const L = leader();
   if (game.invisT > 0 && m.id === 'village') return;
   const tx = Math.floor((L.x + 8) / TILE), ty = Math.floor((L.y + 12) / TILE);
+  if (m.id === 'mountain' && m.tile(tx, ty) === T.CAVEIN && !game.mtn.boss) {
+    L.y += 10; regroup();
+    sfx.bump();
+    fx.toast('Das Riesen-Felsmonster versperrt den Höhleneingang!', 2);
+    return;
+  }
+  if (m.id === 'lair' && tx === 2 && ty === 1) {
+    if (!game.mtn.done) { game.mtn.done = true; endChapter(5); }
+    else { L.y += 12; regroup(); fx.toast('Fortsetzung folgt: Der Drache vom Buttenberg!', 3); }
+    return;
+  }
   const wp = m.warpAt(tx, ty);
-  if (wp) { goTo(wp.to, wp.tx, wp.ty, wp.dir); return; }
+  if (wp) {
+    goTo(wp.to, wp.tx, wp.ty, wp.dir);
+    if (wp.to === 'lair' && !game.seenHints.lairBanner) { game.seenHints.lairBanner = true; fx.banner('HÖHLE DER FELSMONSTER', 'Leise – hier schlafen sie ...', '#ffb040'); }
+    return;
+  }
   if (m.id === 'village' && m.gateOpen && L.y + 8 < 2) {
     goTo('cave', CAVE_SPAWN.x, CAVE_SPAWN.y, CAVE_SPAWN.dir);
     if (!game.seenHints.caveBanner) { game.seenHints.caveBanner = true; fx.banner('KAPITEL 2', 'Die Höhle im Buttenberg', '#ffb040'); }
@@ -1266,7 +1439,8 @@ function checkWarps() {
       if (!game.valley.troll) {
         L.y = 4 * TILE; regroup();
         fx.toast('Der Troll lässt euch nicht durch!', 2);
-      } else { game.valley.done = true; endChapter(4); }
+      } else if (game.valley.done) goTo('mountain', MOUNTAIN_SPAWN.x, MOUNTAIN_SPAWN.y, MOUNTAIN_SPAWN.dir);
+      else { game.valley.done = true; endChapter(4); }
     }
   }
 }
@@ -1371,6 +1545,157 @@ function trollDefeated(e) {
   save();
 }
 
+// --- Kapitel 5: Der Bergpfad -----------------------------------------------------------
+
+function wake(e) {
+  if (!e.asleep) return;
+  e.asleep = false;
+  e.cd = 0.6;
+  sfx.bump();
+  float('!', e.x + 8, e.y - 6, '#ff6060');
+  if (!game.seenHints.wake) { game.seenHints.wake = true; fx.toast('Ein Felsmonster ist aufgewacht! Leise schleichen – oder Friedrich unsichtbar machen.', 3.5); }
+}
+
+// Riesen-Felsmonster: holt aus, stürmt geradeaus los. Läuft es über ein Loch, steckt es fest.
+function updateRockBoss(e, dt, L, nx, ny, d) {
+  const m = map(), a = m.arena;
+  const inArena = L.x > a.x0 - 8 && L.x < a.x1 + 8 && L.y > a.y0 - 8 && L.y < a.y1 + 8;
+  e.modeT -= dt;
+  const setMode = (mode, t) => { e.mode = mode; e.modeT = t; };
+  const clampArena = () => { e.x = Math.max(a.x0, Math.min(a.x1, e.x)); e.y = Math.max(a.y0, Math.min(a.y1, e.y)); };
+  switch (e.mode) {
+    case 'idle':
+      if (!inArena) break;
+      e.flip = nx < 0;
+      e.x += nx * 10 * dt; e.y += ny * 10 * dt; clampArena();
+      if (e.modeT <= 0) { setMode('wind', 0.8); e.vx = nx; e.vy = ny; sfx.push(); }
+      break;
+    case 'wind':
+      if (e.modeT <= 0) { setMode('charge', 2.5); sfx.swing(); }
+      break;
+    case 'charge': {
+      const ox = e.x, oy = e.y;
+      e.x += e.vx * 115 * dt; e.y += e.vy * 115 * dt;
+      clampArena();
+      const tx = Math.floor((e.x + 8) / TILE), ty = Math.floor((e.y + 12) / TILE);
+      if (m.tile(tx, ty) === T.HOLE) {
+        e.x = tx * TILE; e.y = ty * TILE - 4;
+        e.hole = { tx, ty };
+        setMode('stuck', 4.5);
+        sfx.boom();
+        burst(e.x + 8, e.y + 12, DIRT, 18, 60);
+        fx.toast('Es steckt im Loch fest! Schnell angreifen!', 2.5);
+        return;
+      }
+      const hitWall = (e.x === ox && e.y === oy) || e.x <= a.x0 || e.x >= a.x1 || e.y <= a.y0 || e.y >= a.y1;
+      if (hitWall || e.modeT <= 0) { setMode('idle', 1.4 + Math.random()); if (hitWall) { sfx.push(); burst(e.x + 8, e.y + 8, ['#8e8696', '#5e5664'], 8, 40); } }
+      break;
+    }
+    case 'stuck':
+      if (e.modeT <= 0) {
+        m.setTile(e.hole.tx, e.hole.ty, T.DIG); // Loch ist zugeschüttet
+        e.y -= 8;
+        setMode('idle', 1.5);
+        fx.toast('Das Felsmonster hat sich befreit! Arne muss ein neues Loch graben.', 3);
+      }
+      return; // steckt fest: keine Berührungsschäden
+  }
+  if (game.invisT <= 0 && d < 18 && e.mode !== 'stuck') {
+    hurt(1);
+    move(L, nx * 12, ny * 12, false);
+  }
+}
+
+function rockBossDefeated(e) {
+  e.alive = false;
+  game.mtn.boss = true;
+  if (e.hole) m_fill(e.hole);
+  sfx.levelUp();
+  burst(e.x + 8, e.y, ['#8e8696', '#cac2ce', '#5e5664', '#3e8a3a'], 40, 90);
+  fx.gainXP(35, e.x + 8, e.y - 10);
+  fx.banner('RIESEN-FELSMONSTER BESIEGT!', 'Der Weg in die Höhle ist frei', '#a8f070');
+  save();
+}
+function m_fill(h) { map().setTile(h.tx, h.ty, T.DIG); }
+
+function updateJump(L, dt) {
+  const j = game.jump;
+  game.jumpT -= dt;
+  const p = Math.min(1, 1 - game.jumpT / 0.45);
+  L.x = j.x0 + (j.x1 - j.x0) * p;
+  L.y = j.y0 + (j.y1 - j.y0) * p;
+  L.moving = true;
+  L.anim += dt;
+  pushTrail(L);
+  snapFollowers();
+  if (game.jumpT <= 0) { game.jumpT = 0; L.x = j.x1; L.y = j.y1; sfx.bump(); }
+}
+const jumpLift = () => (game.jumpT > 0 ? Math.round(Math.sin((1 - game.jumpT / 0.45) * Math.PI) * 10) : 0);
+
+const theoHiding = () => game.starter !== 'theo' && !game.rec.theo && !game.theoFound;
+
+function revealTheo() {
+  game.theoFound = true;
+  const v = game.maps.village;
+  v.npcs.push(theoNPC());
+  sfx.item();
+  burst(THEO_BUSH.x * TILE + 8, THEO_BUSH.y * TILE + 8, [COL.bush, COL.bushL, '#ffffff'], 14);
+  fx.banner('THEO GEFUNDEN!', 'Er hat sich im Busch versteckt', '#88e0ff');
+  save();
+}
+
+function jellyTalk() {
+  const m = game.maps.lair;
+  const guards = m.enemies.filter((e) => e.guard && e.alive).length;
+  if (guards) return { lines: [
+    'Katze: Miau! MIAU! Holt mich hier raus!',
+    `Katze: Aber passt auf – ${guards === 2 ? 'die zwei Felsmonster' : 'das Felsmonster'} da ${guards === 2 ? 'lassen' : 'lässt'} niemanden an den Käfig!`,
+  ] };
+  if (!game.seenHints.jellyTalk) return {
+    lines: [
+      'Katze: Miau! Ich bin Jelly! Die Felsmonster haben mich gefangen, weil ich ihre Kiesel gejagt habe.',
+      'Jelly: Der Käfig hat ein Zahlenschloss mit Rätseln. Ich kann ja nicht lesen – ich bin eine Katze!',
+      'Jelly: Löst drei Rätsel, dann springt das Schloss auf.',
+    ],
+    after() { game.seenHints.jellyTalk = true; openRiddle('cage'); },
+  };
+  return { lines: ['Jelly: Miau? Probiert das Zahlenschloss nochmal!'], after() { openRiddle('cage'); } };
+}
+
+function freeJelly() {
+  const m = game.maps.lair;
+  m.cage.open = true;
+  m.block[3][12] = false; m.block[3][13] = false;
+  game.mtn.jelly = true;
+  sfx.levelUp();
+  burst(13 * TILE, 3 * TILE + 8, CONFETTI, 24, 60);
+  fx.join('jelly');
+  fx.gainXP(25);
+  fx.banner('JELLY IST DABEI!', 'B: Sprinten – oder über Schluchten springen', '#a8f070');
+  dialog.open([
+    'Jelly: Frei! Danke! Ab jetzt komme ich mit – ich will auch zum Drachen!',
+    'Jelly: Ich bin superschnell und springe weiter als jeder von euch. Holt mich nach vorne und drückt B!',
+  ]);
+  save();
+}
+
+// Gespeicherten Fortschritt auf die Karten anwenden
+function applyMountain() {
+  const t = game.mtn, mm = game.maps.mountain, lm = game.maps.lair;
+  if (t.statue) mm.killStatue();
+  if (t.wall) mm.setTile(18, 19, T.GRASS);
+  if (t.rocks) { mm.setTile(4, 28, T.GRASS); mm.setTile(5, 28, T.BOULDER); }
+  if (t.key) for (const it of mm.items) if (it.type === 'key') it.taken = true;
+  if (t.boss) mm.enemies = mm.enemies.filter((e) => e.type !== 'rockboss');
+  if (t.jelly) {
+    lm.cage.open = true; lm.block[3][12] = false; lm.block[3][13] = false;
+    lm.npcs = lm.npcs.filter((n) => n.id !== 'jelly');
+    lm.enemies = lm.enemies.filter((e) => !e.guard);
+  }
+  if (t.done) lm.setTile(4, 4, T.CFLOOR);
+  for (const m of [mm, lm]) for (const it of m.items) if ((t.taken || []).includes(it.id)) it.taken = true;
+}
+
 function endChapter(n) {
   game.endChapter = n;
   game.state = 'end';
@@ -1395,6 +1720,23 @@ function riddleGen(kind) {
 }
 
 function openRiddle(id) {
+  if (id === 'theo') {
+    game.ui = new RiddleUI(game, fx, { speaker: 'Theos Drachenprüfung', need: 3,
+      gen: () => nextQuestion(['de', 'en', 'geo', 'ma'][Math.floor(Math.random() * 4)]),
+      onSolved() {
+        game.rec.theo = true;
+        fx.join('theo');
+        sfx.levelUp();
+        fx.banner('THEO IST DABEI', 'B: Schutzschild (Laden)', '#a8f070');
+        fx.gainXP(15);
+        dialog.open(['Theo: Bestanden! Okay, ich komme mit. Und meine Karten auch!']);
+      } });
+    return;
+  }
+  if (id === 'cage') {
+    game.ui = new RiddleUI(game, fx, { speaker: 'Zahlenschloss am Käfig', need: 3, gen: () => HW.toQuestion(mountainQuestion()), onSolved: freeJelly });
+    return;
+  }
   const m = game.maps.haunted, h = game.haunt;
   if (id === 'bit') {
     game.ui = new RiddleUI(game, fx, { speaker: 'Bit, das Computer-Gespenst', need: 3, gen: riddleGen('binary'),
@@ -1559,10 +1901,11 @@ function drawShovel(L, sx, sy) {
 function drawLeader(cam) {
   const L = leader();
   if (game.hurtT > 0 && Math.floor(game.time * 20) % 2) return;
-  const sx = Math.round(L.x - cam.x), sy = Math.round(L.y - cam.y);
+  const sx = Math.round(L.x - cam.x), sy = Math.round(L.y - cam.y) - jumpLift();
   const alpha = game.invisT > 0 ? 0.28 + 0.08 * Math.sin(game.time * 8) : 1;
   if (game.swingT > 0 && L.dir === 1) drawShovel(L, sx, sy);
-  drawCharacter(L, cam, alpha);
+  drawCharacter(L, { x: cam.x, y: cam.y + jumpLift() }, alpha);
+  if (game.sprintT > 0) { g.fillStyle = 'rgba(200,240,255,0.5)'; for (let i = 1; i <= 3; i++) g.fillRect(sx + 8 - DIRV[L.dir][0] * (6 + i * 4), sy + 10 - DIRV[L.dir][1] * (4 + i * 4), 2, 1); }
   if (game.swingT > 0 && L.dir !== 1) drawShovel(L, sx, sy);
   if (game.shieldT > 0) drawShield(sx, sy);
 }
@@ -1658,10 +2001,12 @@ function renderWorld(cam) {
     const want = { witch: !h.gate, bodo: h.gate && !h.front, zora: h.front && !h.count, plumps: h.chest && !h.lib, bit: h.lib && !h.candles, graf: h.candles && !h.king };
     for (const [id, show] of Object.entries(want)) if (show) bubbles.add(id);
   }
-  if (game.state === 'play' && m.id === 'village') {
-    if (game.step === 0) bubbles.add('felix');
-    if (game.step === 3 || game.step === 5) bubbles.add('mama');
+  if (game.state === 'play' && m.id === 'village' && game.step < 7) {
+    if (!game.rec.felix) bubbles.add('felix');
+    if (game.theoFound && !game.rec.theo) bubbles.add('theo');
+    if (game.mama === 0 || (game.hasCloak && game.mama < 2)) bubbles.add('mama');
   }
+  if (game.state === 'play' && m.id === 'lair' && !game.mtn.jelly) bubbles.add('jelly');
   for (const n of m.npcs) {
     add(n.y + 16, n.x + 8 - cam.x, n.y + 16 - cam.y, () => { drawCharacter(n, cam); if (bubbles.has(n.id)) bubble(n, cam); });
   }
@@ -1744,6 +2089,37 @@ function renderWorld(cam) {
 function drawEnemy(e, cam) {
   if (e.hurtT > 0 && Math.floor(game.time * 30) % 2) return;
   const sx = Math.round(e.x - cam.x), sy = Math.round(e.y - cam.y);
+  if (e.type === 'rockboss') {
+    const shake = e.mode === 'wind' ? Math.round(Math.sin(game.time * 60)) : 0;
+    const mode = e.mode === 'charge' ? 'charge' : e.mode === 'wind' ? 'wind' : e.mode === 'stuck' ? 'stuck' : 'idle';
+    if (e.mode === 'stuck') { g.fillStyle = '#2a1a10'; g.fillRect(sx - 6, sy + 10, 28, 8); }
+    g.drawImage(rockBossSprite(mode, Math.floor(game.time * 3) % 2), sx - 8 + shake, sy - 16 + (e.mode === 'stuck' ? 6 : 0));
+    if (e.mode === 'stuck') {
+      for (let i = 0; i < 3; i++) {
+        const a = game.time * 4 + (i * Math.PI * 2) / 3;
+        g.fillStyle = '#f8d848'; g.fillRect(Math.round(sx + 8 + Math.cos(a) * 11), Math.round(sy - 14 + Math.sin(a) * 3), 2, 2);
+      }
+    }
+    g.fillStyle = '#1a1020'; g.fillRect(sx - 4, sy - 22, 24, 4);
+    g.fillStyle = '#e83848'; g.fillRect(sx - 3, sy - 21, Math.round((22 * e.hp) / HP.rockboss), 2);
+    return;
+  }
+  if (e.type === 'rockmon') {
+    shadow(sx, sy);
+    g.drawImage(rockmonSprite(!e.asleep, Math.floor(e.anim * 4) % 2), sx, sy);
+    if (e.asleep) {
+      const t = (game.time * 0.8 + e.id * 0.37) % 1;
+      g.fillStyle = 'rgba(220,230,255,0.85)';
+      const zx = sx + 11 + Math.round(t * 4), zy = sy + 2 - Math.round(t * 8);
+      g.fillRect(zx, zy, 3, 1); g.fillRect(zx + 1, zy + 1, 1, 1); g.fillRect(zx, zy + 2, 3, 1);
+    }
+    return;
+  }
+  if (e.type === 'mtroll') {
+    shadow(sx, sy);
+    g.drawImage(mtrollSprite(e.flip, Math.floor(e.anim * 4) % 2), sx, sy);
+    return;
+  }
   if (e.type === 'trollboss') {
     g.drawImage(trollSprite(e.throwT > 0 || e.hurtT > 0 ? 1 : 0), sx - 4, sy - 10);
     if (e.stunT > 0) {
@@ -1791,6 +2167,7 @@ function abilityLabel(id) {
     felix: [o.strength && 'Stärke', o.sling && `Schleuder (${game.ammo})`],
     arne: [o.dig && 'Graben', o.shovel && 'Schaufel'],
     friedrich: [o.invis && 'Unsichtbar'],
+    jelly: ['Sprinten & Springen'],
   }[id].filter(Boolean);
   return parts.length ? parts.join(' + ') : 'noch nichts (Laden)';
 }
@@ -1807,7 +2184,7 @@ function renderHUDLow() {
   g.fillStyle = '#a8f8b8'; g.fillRect(bx, by, fill, 1);
   game.party.forEach((m, i) => {
     const spr = charSprite(m.pal, 0, 0);
-    const x = 176 + i * 15, y = 13;
+    const x = Math.min(176, W - 4 - game.party.length * 15) + i * 15, y = 13;
     g.fillStyle = i === 0 ? '#f8d848' : 'rgba(10,14,32,0.6)';
     g.fillRect(x - 1, y - 1, 14, 11);
     g.drawImage(spr, 1, 0, 14, 9, x, y, 12, (9 * 12) / 14);
@@ -1919,11 +2296,12 @@ function render() {
   if (dialog.active) dialog.visibleLines().forEach((l, i) => text(l, 12, 119 + i * 11, { size: 8, shadow: false }));
 }
 
-const NOOP_CTX = { fillStyle: '', fillRect() {} };
+const NOOP_CTX = { fillStyle: '', fillRect() {}, drawImage() {} };
 
 function renderTitle() {
-  text('THEOS', W / 2, 24, { size: 24, align: 'center', color: '#f8d848' });
-  text('Theo und der Drache vom Buttenberg', W / 2, 58, { size: 6, align: 'center', color: '#e8f0ff' });
+  text('BUTTENBERG', W / 2, 18, { size: 18, align: 'center', color: '#f8d848' });
+  text('ADVENTURES', W / 2, 42, { size: 10, align: 'center', color: '#88e0ff' });
+  text('Vier Freunde gegen den Drachen', W / 2, 60, { size: 6, align: 'center', color: '#e8f0ff' });
   (game.titleCache || titleItems()).forEach((it, i) => {
     const sel = i === game.menu;
     text((sel ? '> ' : '  ') + it.label, 66, 78 + i * 12, { size: 7, color: sel ? '#f8d848' : '#b8c8e8' });
@@ -1947,6 +2325,7 @@ function renderEnd() {
   if (game.endT < 0.6) return;
   if (game.endChapter === 3) return renderEnd3();
   if (game.endChapter === 4) return renderEnd4();
+  if (game.endChapter === 5) return renderEnd5();
   const st = game.stats, c = game.maps.cave, cv = game.cave;
   const crystals = c.items.filter((i) => i.type === 'crystal' && i.taken).length;
   text('ENDE KAPITEL 2', W / 2, 18, { size: 12, align: 'center', color: '#f8d848' });
@@ -1981,6 +2360,27 @@ function renderEnd4() {
   rows.forEach(([a, b], i) => {
     text(a, 40, 56 + i * 11, { size: 6, color: '#b8c8e8' });
     text(b, 200, 56 + i * 11, { size: 6, align: 'right', color: '#a8f070' });
+  });
+  text('Als Nächstes: Der Bergpfad', W / 2, 120, { size: 6, align: 'center' });
+  if (game.endT > 1.5 && Math.floor(game.time * 2) % 2 === 0) text('A: Weiterspielen', W / 2, 138, { size: 6, align: 'center', color: '#a8f070' });
+}
+
+function renderEnd5() {
+  const st = game.stats, mm = game.maps.mountain, lm = game.maps.lair;
+  const crystals = [...mm.items, ...lm.items].filter((i) => i.type === 'crystal');
+  const rocks = [...mm.enemies, ...lm.enemies].filter((e) => e.type === 'rockmon');
+  text('ENDE KAPITEL 5', W / 2, 18, { size: 12, align: 'center', color: '#f8d848' });
+  text('Der Bergpfad ist geschafft – Jelly ist frei!', W / 2, 40, { size: 6, align: 'center' });
+  const rows = [
+    ['Kristalle', `${crystals.filter((i) => i.taken).length} / ${crystals.length}`],
+    ['Schläfer nicht geweckt', `${rocks.filter((e) => e.alive && e.asleep).length} / ${rocks.filter((e) => !e.guard).length}`],
+    ['Riesen-Felsmonster', 'besiegt!'],
+    ['Diamanten', String(game.diamonds)],
+    ['Level', String(st.level)],
+  ];
+  rows.forEach(([a, b], i) => {
+    text(a, 28, 56 + i * 11, { size: 6, color: '#b8c8e8' });
+    text(b, 212, 56 + i * 11, { size: 6, align: 'right', color: '#a8f070' });
   });
   text('Fortsetzung folgt: Der Drache vom Buttenberg', W / 2, 120, { size: 6, align: 'center' });
   if (game.endT > 1.5 && Math.floor(game.time * 2) % 2 === 0) text('A: Weiterspielen', W / 2, 138, { size: 6, align: 'center', color: '#a8f070' });

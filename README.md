@@ -1,8 +1,10 @@
-# TheOS – Theo und der Drache vom Buttenberg
+# Buttenberg Adventures
+
+(Repository: TheOS)
 
 > **Based on the Pokemon Gen 1 Recompilation Project by BOIS CLUB GAMES, LLC
 > (https://github.com/bryanthaboi/gen1recomp)** – die 3D-Kippansicht ist eine Portierung von dessen
-> `Tilt.lua`. TheOS steht unter der GPLv3 mit den Zusatzbedingungen von gen1recomp, siehe `LICENSE.md`.
+> `Tilt.lua`. Buttenberg Adventures steht unter der GPLv3 mit den Zusatzbedingungen von gen1recomp, siehe `LICENSE.md`.
 
 Top-down-Abenteuer im Stil der GBA-Ära: questen, leveln, erkunden – und nebenbei lernen.
 Alle Grafiken und Sounds sind eigene Pixel-Art bzw. per Code erzeugt – keine fremden Assets.
@@ -11,8 +13,9 @@ Alle Grafiken und Sounds sind eigene Pixel-Art bzw. per Code erzeugt – keine f
 
 ## Die Idee
 
-Theo will den bösen Drachen am Buttenberg besiegen – zusammen mit seinen besten Freunden Felix und Arne
-und seinem kleinen Bruder Friedrich. Die Gruppe läuft zusammen, wer vorne läuft, setzt seine Spezialkraft ein.
+Vier Freunde wollen den bösen Drachen am Buttenberg besiegen: Theo, seine besten Freunde Felix und Arne
+und sein kleiner Bruder Friedrich. **Mit wem man startet, sucht man sich aus** – die anderen drei müssen erst
+überzeugt werden. Die Gruppe läuft zusammen, wer vorne läuft, setzt seine Spezialkraft ein.
 
 **Alle Fähigkeiten müssen im Laden gekauft werden.** Bezahlt wird mit Diamanten – die gibt es in der Schule
 für richtig gelöste Aufgaben in Deutsch, Englisch, Geographie und Mathe (Klasse 5, Gymnasium BW).
@@ -23,11 +26,20 @@ für richtig gelöste Aufgaben in Deutsch, Englisch, Geographie und Mathe (Klass
 | Felix | Superstärke – Felsen schieben, Büsche ausreißen | Kastanien-Schleuder |
 | Arne | Graben – Tunnel, Erdwände, Schätze | Schaufelschlag |
 | Friedrich | Tarnzauber – unsichtbar an Wachen vorbei | – |
+| Jelly (Katze, ab Kapitel 5) | Sprinten und über Schluchten springen | – (braucht keinen Laden) |
 
 ## Kapitel
 
-**1 – Die Gefährten (Dorf Lindental):** Kastanienprobe bei Felix → Fels vor Arnes Tür → Tunnel in Oma Hildes
-Garten, Tarnumhang holen → Mama erlaubt Friedrich mitzukommen → unsichtbar an Wache Konrad vorbei zum Torhebel.
+**1 – Die Gefährten (Dorf Lindental):** Startfigur wählen, dann die anderen überzeugen (Reihenfolge frei):
+
+| Wer | Was er will |
+|---|---|
+| Felix | Kastanienprobe: 5 Kastanien überstehen – ausweichen oder mit Theos Schild abwehren |
+| Theo | Spielt Verstecken (in einem Busch im Dorf). Gefunden? Dann seine Drachenprüfung: 3 Schulfragen |
+| Arne | Felsbrocken vor seiner Tür – nur Felix' Superstärke schiebt ihn weg |
+| Friedrich | Mama erlaubt es nur mit Tarnumhang (in Oma Hildes Garten – Arne gräbt unter dem Zaun durch). Gilt auch, wenn Friedrich die Startfigur ist |
+
+Sind alle vier dabei: unsichtbar an Wache Konrad vorbei zum Torhebel.
 
 **2 – Die Höhle im Buttenberg:** Erdwand (Arne) → Schleimhalle → Felsblock (Felix) → Schlüssel bei den
 Feuer-Kobolden → Drachenstatue (Theo wirft ihr Feuer zurück) → Höhlentroll (Friedrich schleicht vorbei)
@@ -62,10 +74,23 @@ A–E verbinden sie über die Unterwelt.
 
 Theo greift mit **B** an, wenn ein Gegner direkt vor ihm steht – sonst hebt er den Schild.
 
+**5 – Der Bergpfad** (nach Theos Skizze „Level 5“): Felsmonster halten auf dem Gipfel die Katze Jelly gefangen.
+
+| Ort | Was passiert |
+|---|---|
+| Eingang, Pfad | Fledermäuse, Bergtrolle |
+| Platz | Rechts eine Feuer spuckende Statue (Theo wirft das Feuer zurück), links ein Felsbrocken (Felix) |
+| Erdmauer → Kammer | Arne gräbt durch; Bergtrolle, Apfel und der **Schlüssel** |
+| Gewundener Pfad, Bergkessel | Schlafende Felsmonster – wer zu nah kommt (oder sprintet), weckt sie. Friedrich schleicht unsichtbar vorbei. Kastanien prallen am Stein ab |
+| Riesen-Felsmonster (Boss) | Holt aus und stürmt los. Arne gräbt Löcher – stürmt es hinein, steckt es fest und das Schwert trifft. Danach schüttet es das Loch zu |
+| Höhle der Felsmonster | Zwei Wächter am Käfig, viele Schläfer. Das Zahlenschloss öffnet sich nach 3 richtigen Lernaufgaben (Berge, Höhen, Deutsch) → **Jelly kommt mit** |
+| Verschlossene Tür, Schlucht | Schlüssel öffnet die Tür; über die Schlucht springt nur Jelly – die anderen klettern hinterher |
+
 Der Spielstand wird automatisch im Browser gespeichert („Weiterspielen“ im Titelbild).
 Im Spiel öffnet **Esc / P** (Gamepad: Start, Touch: ☰) das Menü: 3 Speicherplätze und ein **Speichercode**
 zum Abschreiben (auch als Link: `?code=XXXX-XXXX-XXXX-XXXX-XXXX`). Über **Kapitel wählen** im Titelbild
-startet man jedes Kapitel direkt – mit allen Fähigkeiten, die man bis dahin hätte.
+startet man jedes Kapitel direkt – mit allen Fähigkeiten, die man bis dahin hätte. Ältere Speichercodes
+bleiben gültig (Startfigur ist dann Theo).
 
 ## 3D-Ansicht
 
@@ -98,6 +123,10 @@ Alles in `src/quiz.js`:
   in den passenden Pool (`DE`, `EN`, `GEO`) schreiben. Vokabeln in `VOCAB`, Hauptstädte in `LAENDER` / `EUROPA`.
 - **Mathe** wird zufällig erzeugt (`MATH`-Liste): Rechnen, Punkt vor Strich, Klammern, ganze Zahlen, Runden,
   Größen umrechnen, Rechteck, Teiler – dazu schriftliche Division und Binärzahlen.
+
+In `src/mountain.js` (Kapitel 5, Zahlenschloss): `BERGE` (Gebirge, Karten, Höhen), `DEUTSCH`
+(Wortarten, Zeitformen, Satzglieder) und `MATHE` (Höhenunterschiede, Maßstab, Wanderzeit – zufällig erzeugt).
+Theos Drachenprüfung in Kapitel 1 nimmt Fragen aus allen vier Schulfächern.
 
 In `src/halloween.js` (Spukhaus und Schule):
 - `BOOK_VOCAB` – Vokabeln aus dem Lehrbuch („Here we go“, S. 174/175), `BOOK_GRAMMAR` – Sätze/Grammatik dazu
@@ -140,13 +169,14 @@ python -m http.server 8000
 ```
 index.html        Seite, Touch-Steuerung, Styles
 src/main.js       Spielschleife, Gruppe, Fähigkeiten, Kampf, Kartenwechsel, HUD
-src/maps.js       Karten: Dorf, Schule, Laden, Höhle, Spukhaus, Tal der Trolle + Unterwelt
+src/maps.js       Karten: Dorf, Schule, Laden, Höhle, Spukhaus, Tal der Trolle + Unterwelt, Bergpfad + Felsmonster-Höhle
 src/world.js      Tile-System, Kollision, Tile- und Objektgrafik
 src/npcs.js       Figuren, Dialoge, Quest-Schritte und Hinweise
 src/quiz.js       Lernaufgaben der Schule (Fragenpools + Mathe-Generator)
 src/halloween.js  Halloween-, Lehrbuch-, Binär- und Divisionsaufgaben
+src/mountain.js   Lernaufgaben Kapitel 5 (Berge, Höhen, Deutsch)
 src/shop.js       Ladenangebot und Kauf
-src/ui.js         Menüs: Schule, Laden, Rätseltüren, Pause/Speichern, Kapitelauswahl
+src/ui.js         Menüs: Schule, Laden, Rätseltüren, Pause/Speichern, Kapitel- und Figurenwahl
 src/save.js       Spielstände (localStorage, 3 Plätze) und Speichercode
 src/sprites.js    Figuren-, Gegner- und Gegenstands-Sprites
 src/dialog.js     Dialogbox mit Schreibmaschinen-Effekt

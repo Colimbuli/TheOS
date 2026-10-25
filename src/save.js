@@ -13,6 +13,7 @@ export function snapshot(game) {
     mapId: game.mapId, x: L.x, y: L.y, dir: L.dir,
     party: game.party.map((m) => m.id),
     stats: game.stats, step: game.step, owned: game.owned,
+    starter: game.starter, rec: game.rec, mama: game.mama, theoFound: game.theoFound, mtn: game.mtn,
     diamonds: game.diamonds, ammo: game.ammo, hasCloak: game.hasCloak,
     cave: game.cave, haunt: game.haunt, valley: game.valley, quizStats: game.quizStats, quizIntro: game.quizIntro,
     seenHints: game.seenHints, checkpoint: game.checkpoint,
@@ -46,12 +47,22 @@ const OWN = ['shield', 'strength', 'dig', 'invis', 'sling', 'shovel', 'shield2',
 const VALLEY = ['sword', 'key', 'lever', 'door', 'troll', 'done'];
 const CAVE = ['dug', 'boulder', 'key', 'door', 'statue', 'troll', 'lever', 'secret', 'done'];
 const HAUNT = ['gate', 'front', 'count', 'chest', 'lib', 'candles', 'king', 'door6', 'done'];
-const MAPS = ['village', 'cave', 'haunted', 'valley', 'under'];
+const MAPS = ['village', 'cave', 'haunted', 'valley', 'under', 'mountain', 'lair'];
+const STARTERS = ['theo', 'felix', 'arne', 'friedrich'];
+const MTN = ['statue', 'wall', 'rocks', 'key', 'boss', 'jelly', 'done'];
 
 // Feldliste: [Bitbreite, Wert lesen]. v = 1 (alt, 16 Zeichen) oder 2 (neu, 20 Zeichen)
 function fields(v = 2) {
   const flags = (names, obj) => names.reduce((v, n, i) => v | ((obj && obj[n] ? 1 : 0) << i), 0);
+  // Kapitel 5 und die freie Startfigur stecken in den obersten 14 Bits – die waren in v2-Codes
+  // immer 0, deshalb bleiben alte Codes gültig (Startfigur Theo, Kapitel 5 nicht begonnen).
   return [
+    ...(v === 1 ? [] : [
+      [2, (s) => Math.max(0, STARTERS.indexOf(s.starter || 'theo'))],
+      [4, (s) => flags(STARTERS, s.rec)],
+      [1, (s) => (s.mama === 2 ? 1 : 0)],
+      [7, (s) => flags(MTN, s.mtn)],
+    ]),
     [3, (s) => s.step],
     [1, (s) => (s.hasCloak ? 1 : 0)],
     [v === 1 ? 7 : 8, (s) => flags(OWN, s.owned)],
@@ -104,14 +115,15 @@ export function decodeCode(code) {
   const f = fields(v);
   const vals = [];
   for (let i = f.length - 1; i >= 0; i--) { const bits = f[i][0]; vals.unshift(Number(n & BigInt((1 << bits) - 1))); n >>= BigInt(bits); }
-  if (v === 1) vals.splice(11, 0, 0); // alte Codes: kein Tal-Fortschritt
-  const [step, cloak, own, hearts, diamonds, ammo, level, xp, cave, haunt, target, valley, map] = vals;
+  if (v === 1) { vals.splice(11, 0, 0); vals.unshift(0, 0, 0, 0); } // alte Codes: kein Tal-Fortschritt
+  const [starter, rec, mama, mtn, step, cloak, own, hearts, diamonds, ammo, level, xp, cave, haunt, target, valley, map] = vals;
   const unpack = (names, v) => Object.fromEntries(names.map((nm, i) => [nm, !!(v >> i & 1)]));
   const owned = Object.fromEntries(OWN.filter((_, i) => own >> i & 1).map((k) => [k, true]));
   if (hearts) owned.heart = hearts;
   return {
     step, hasCloak: !!cloak, owned, diamonds, ammo, level: Math.max(1, level), xp,
     cave: unpack(CAVE, cave), haunt: { ...unpack(HAUNT, haunt), target: Math.max(5, target) }, valley: unpack(VALLEY, valley),
+    starter: STARTERS[starter], rec: unpack(STARTERS, rec), mama: mama ? 2 : 0, mtn: unpack(MTN, mtn),
     mapId: MAPS[map] || 'village',
   };
 }

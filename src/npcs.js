@@ -1,9 +1,13 @@
 // Bewohner von Lindental, Gefährten und alle Dialoge von Kapitel 1.
 //
-// game.step:
-//   0 Felix finden            1 Kastanienprobe läuft     2 Felix dabei – Arne abholen
-//   3 Arne dabei – Mama fragen 4 Tarnumhang suchen        5 Umhang gefunden – zu Mama
-//   6 Friedrich dabei – zum Torhebel schleichen            7 Tor offen – ab nach Norden (Höhle)
+// Die Startfigur ist frei wählbar (game.starter). Die anderen drei müssen überzeugt werden:
+//   Felix     – Kastanienprobe (5 Kastanien überstehen: ausweichen oder Schild)
+//   Arne      – Felsbrocken vor seiner Tür wegschieben (Felix' Superstärke)
+//   Friedrich – Mama erlaubt es nur mit Tarnumhang (liegt in Oma Hildes Garten, Arne gräbt)
+//   Theo      – spielt Verstecken (Busch im Nordosten), dann seine Drachenprüfung (3 Schulfragen)
+// Ist Friedrich die Startfigur, braucht er trotzdem Mamas Erlaubnis.
+// game.rec: wer dabei ist · game.mama: 0 nicht gefragt, 1 Umhang gesucht, 2 erlaubt
+// game.step: 0 Kapitel 1 läuft, 7 Tor offen
 //
 // Alle vier Spezialfähigkeiten müssen im Laden gekauft werden (Diamanten gibt's in der Schule).
 
@@ -14,39 +18,86 @@ export const HEROES = {
   felix:     { name: 'Felix', ability: 'Stärke' },
   arne:      { name: 'Arne', ability: 'Graben' },
   friedrich: { name: 'Friedrich', ability: 'Unsichtbar' },
+  jelly:     { name: 'Jelly', ability: 'Sprinten & Springen' },
 };
+export const STARTERS = ['theo', 'felix', 'arne', 'friedrich'];
 
-export function createNPCs() {
+// Wo die Figuren im Dorf stehen (die Startfigur beginnt dort)
+export const HOME = {
+  theo: { x: 10 * T, y: 8 * T, dir: 0 },
+  felix: { x: 6 * T, y: 9 * T, dir: 0 },
+  arne: { x: 24 * T, y: 10 * T, dir: 0 },
+  friedrich: { x: 8 * T + 6, y: 9 * T + 4, dir: 0 },
+};
+export const THEO_BUSH = { x: 28, y: 6 };
+
+export function createNPCs(starter = 'theo') {
   return [
-    { id: 'felix', pal: 'felix', x: 6 * T, y: 9 * T, dir: 0 },
+    { id: 'felix', pal: 'felix', ...HOME.felix },
     { id: 'mama', pal: 'mama', x: 11 * T + 2, y: 9 * T, dir: 0 },
-    { id: 'friedrich', pal: 'friedrich', x: 8 * T + 6, y: 9 * T + 4, dir: 0 },
+    { id: 'friedrich', pal: 'friedrich', ...HOME.friedrich },
     { id: 'lotte', pal: 'merchant', x: 20 * T + 8, y: 150, dir: 0 },
     { id: 'konrad', pal: 'guard', x: 14 * T, y: 3 * T, dir: 0, spear: true },
-  ].map((n) => ({ anim: 0, moving: false, ...n }));
+  ].filter((n) => n.id !== starter).map((n) => ({ anim: 0, moving: false, ...n }));
 }
 
-const STEP_HINT = [
-  'Quest: Überzeuge Felix',
-  'Quest: Halte 5 Kastanien auf',
-  'Quest: Hol Arne ab',
-  'Quest: Frag Mama wegen Friedrich',
-  'Quest: Hol den Tarnumhang',
-  'Quest: Bring Mama den Umhang',
-  'Quest: Unsichtbar zum Torhebel',
-  'Ziel: Die Höhle im Buttenberg (Norden)',
-];
-// Welche gekaufte Fähigkeit braucht der aktuelle Schritt?
-const STEP_NEEDS = { 0: 'shield', 1: 'shield', 2: 'strength', 4: 'dig', 6: 'invis' };
+// Theo springt aus seinem Versteck
+export function theoNPC() {
+  return { id: 'theo', pal: 'theo', x: (THEO_BUSH.x - 1) * T, y: THEO_BUSH.y * T, dir: 3, anim: 0, moving: false };
+}
+
 export const ABILITY_NAME = { shield: 'Theos Schutzschild', strength: 'Felix\' Superstärke', dig: 'Arnes Grabkraft', invis: 'Friedrichs Tarnzauber' };
 
+const lead = (game) => HEROES[game.party[0].id].name;
+const starterName = (game) => HEROES[game.starter || 'theo'].name;
+const momName = (game) => (['theo', 'friedrich'].includes(game.starter || 'theo') ? 'Mama' : 'Theos Mama');
+export const allFour = (game) => STARTERS.every((id) => game.party.some((m) => m.id === id));
+
+// Nächstes Ziel in Kapitel 1 (für Hinweiszeile und Lotte)
+export function villageGoal(game) {
+  const r = game.rec, o = game.owned, has = (id) => game.party.some((m) => m.id === id);
+  const buy = (id) => `Quest: Kauf ${ABILITY_NAME[id]}`;
+  if (!r.felix) return game.challenge.active ? 'Quest: Überstehe 5 Kastanien' : 'Quest: Überzeuge Felix';
+  if (!r.theo) return game.theoFound ? 'Quest: Theos Drachenprüfung' : 'Quest: Finde Theo – er spielt Verstecken';
+  if (!r.arne) return !has('felix') ? 'Quest: Überzeuge Felix' : o.strength ? 'Quest: Befreit Arne (Fels vor der Tür)' : buy('strength');
+  if (game.mama < 2) {
+    if (game.mama === 0 && !game.hasCloak) return game.starter === 'friedrich' ? 'Quest: Frag Mama, ob du mitdarfst' : 'Quest: Frag Mama wegen Friedrich';
+    if (!game.hasCloak) return o.dig ? 'Quest: Hol den Tarnumhang (Garten)' : buy('dig');
+    return 'Quest: Bring Mama den Umhang';
+  }
+  if (!o.invis) return buy('invis');
+  return 'Quest: Unsichtbar zum Torhebel';
+}
+
+const LOTTE_TIPS = {
+  felix: 'Lotte: Felix? Der übt gerade Kastanien-Weitwurf vor seinem Haus.',
+  theo: 'Lotte: Theo? Der spielt Verstecken. Vorhin hat im Nordosten ein Busch ganz komisch geraschelt ...',
+  arne: 'Lotte: Arne sitzt fest – seit dem Sturm liegt ein Felsbrocken vor seiner Tür! Wer stark ist, schiebt ihn zur Seite.',
+  mama: 'Lotte: Oma Hildes Garten? Die Erde unter dem Zaun ist ganz locker...',
+  gate: 'Lotte: Konrad lässt niemanden durch. Aber wen er nicht sieht, den hält er auch nicht auf...',
+  done: 'Lotte: Viel Glück im Buttenberg! Brunos Schleuder soll gegen Schleime super helfen.',
+};
+
 export function questHint(game) {
+  if (game.mapId === 'mountain' || game.mapId === 'lair') return mountainHint(game);
   if (game.mapId === 'valley' || game.mapId === 'under') return valleyHint(game);
   if (game.mapId === 'haunted') return hauntHint(game);
   if (game.mapId === 'cave' || game.step >= 7 && game.mapId !== 'village') return caveHint(game);
-  const need = STEP_NEEDS[game.step];
-  if (need && !game.owned[need]) return `Quest: Kauf ${ABILITY_NAME[need]}`;
-  return STEP_HINT[game.step];
+  if (game.step >= 7) return 'Ziel: Die Höhle im Buttenberg (Norden)';
+  return villageGoal(game);
+}
+
+function mountainHint(game) {
+  const t = game.mtn, o = game.owned;
+  const need = (id, text) => (o[id] ? text : `Quest: Kauf ${ABILITY_NAME[id]}`);
+  if (!t.statue) return 'Quest: Besiegt die Feuerstatue (Theo)';
+  if (!t.wall) return need('dig', 'Quest: Grabt durch die Erdmauer (Arne)');
+  if (!t.key) return 'Quest: Holt den Schlüssel';
+  if (!t.rocks) return need('strength', 'Quest: Schiebt den Felsbrocken (Felix)');
+  if (!t.boss) return 'Quest: Besiegt das Riesen-Felsmonster';
+  if (!t.jelly) return 'Quest: Befreit die Katze aus dem Käfig';
+  if (!t.done) return 'Quest: Durch die Tür und über die Schlucht';
+  return 'Ziel: Weiter zum Drachen';
 }
 
 function valleyHint(game) {
@@ -87,90 +138,97 @@ function caveHint(game) {
 
 // Liefert { lines, after } – after() läuft, wenn der Dialog geschlossen wird.
 export function talkTo(n, game, fx) {
-  const s = game.step;
+  const L = lead(game), S = starterName(game), M = momName(game);
   switch (n.id) {
     case 'felix':
-      if (s === 0 && !game.owned.shield) return { lines: [
-        'Theo: Felix! Kommst du mit zum Buttenberg? Wir besiegen den bösen Drachen!',
-        'Felix: Den Drachen?! Da brauchst du Mut – und einen Schild! Du hast ja nicht mal einen.',
-        'Felix: Bruno im Laden verkauft welche. Für Diamanten. Die gibt\'s in der Schule fürs Lernen.',
-      ] };
-      if (s === 0) return {
+      if (game.challenge.active) return { lines: ['Felix: Konzentrier dich! Ausweichen – oder mit Theos Schild abwehren!'] };
+      if (!game.seenHints.felixTalk) return {
         lines: [
-          'Theo: Felix! Kommst du mit zum Buttenberg? Wir besiegen den bösen Drachen!',
+          `${L}: Felix! Kommst du mit zum Buttenberg? Wir besiegen den bösen Drachen!`,
           'Felix: Den Drachen?! Hm... nur wenn du wirklich mutig bist.',
-          'Felix: Ich werfe Kastanien nach dir. Halte 5 Stück mit deinem Schutzschild auf!',
-          'Wähle Theo als Anführer und drück B, um den Schild hochzuhalten – genau dann, wenn eine Kastanie kommt!',
+          'Felix: Ich werfe Kastanien nach dir. Überstehe 5 Stück, ohne getroffen zu werden!',
+          'Tipp: Ausweichen oder – wenn Theo dabei ist und den Schild hat – mit B abwehren.',
         ],
-        after() { game.step = 1; fx.startChallenge(); },
+        after() { game.seenHints.felixTalk = true; fx.startChallenge(); },
       };
-      if (game.challenge.active) return { lines: ['Felix: Konzentrier dich! Schild hoch mit B!'] };
       return {
         lines: ['Felix: Nochmal? Okay – fünf Kastanien. Los geht\'s!'],
         after() { fx.startChallenge(); },
       };
 
-    case 'mama':
-      if (s < 3) return { lines: [
-        'Mama: Theo! Was hast du denn heute vor?',
-        'Theo: Ein Abenteuer! Aber zuerst brauche ich meine Freunde.',
-        'Mama: Na dann. Und vergiss die Schule nicht – Frau Klug hat heute Extra-Aufgaben!',
-      ] };
-      if (s === 3 && !game.hasCloak) return {
-        lines: [
-          'Theo: Mama, darf Friedrich mitkommen? Wir gehen zum Buttenberg!',
-          'Mama: Zum Buttenberg? Nur wenn ihr zusammenbleibt – und Friedrich seinen Tarnumhang mitnimmt.',
-          'Mama: Aber der ist gestern über den Zaun in Oma Hildes Garten geweht. Und Oma Hilde ist verreist...',
+    case 'theo':
+      return {
+        lines: game.seenHints.theoTalk ? ['Theo: Na, bereit für die Drachenprüfung?'] : [
+          'Theo: HA! Gefunden. Na gut ... Zum Buttenberg? Zum DRACHEN?',
+          'Theo: Da komm ich mit! Ich hab nämlich schon Karten vom ganzen Berg gezeichnet. Geheime Karten!',
+          'Theo: Aber wer zum Drachen will, muss schlau sein. Drachen stellen Rätsel! Das weiß doch jeder.',
+          'Theo: Also: meine Drachenprüfung. Drei richtige Antworten – dann bin ich dabei.',
         ],
-        after() { game.step = 4; fx.banner('NEUE QUEST', 'Hol den Tarnumhang aus dem Garten', '#88e0ff'); },
+        after() { game.seenHints.theoTalk = true; fx.openRiddle('theo'); },
       };
-      if (s === 4) return { lines: ['Mama: Oma Hildes Garten ist im Südwesten. Das Gartentor ist leider abgeschlossen.'] };
-      if (s === 5 || (s === 3 && game.hasCloak)) return {
+
+    case 'mama': {
+      const asFried = game.starter === 'friedrich';
+      if (game.mama === 2) return { lines: [`${M}: Und denkt an eure Jacken!`] };
+      if (game.hasCloak) return {
         lines: [
-          'Theo: Hier ist Friedrichs Tarnumhang!',
-          'Mama: Prima. Dann darf Friedrich mit. Passt gut auf ihn auf!',
+          `${L}: Hier ist Friedrichs Tarnumhang!`,
+          `${M}: Prima. Dann darf Friedrich mit. Passt gut auf ihn auf!`,
           'Friedrich: JAAA! Mit dem Umhang kann ich mich unsichtbar machen!',
         ],
         after() {
-          fx.join('friedrich');
-          game.step = 6;
+          game.mama = 2;
           fx.sfx.item();
-          fx.banner('FRIEDRICH IST DABEI', 'B: unsichtbar werden', '#a8f070');
+          if (!asFried && !game.rec.friedrich) {
+            game.rec.friedrich = true;
+            fx.join('friedrich');
+            fx.banner('FRIEDRICH IST DABEI', 'B: unsichtbar werden (Laden)', '#a8f070');
+          } else fx.banner('MAMA ERLAUBT ES', 'Friedrich darf mit zum Buttenberg', '#a8f070');
           fx.gainXP(15, n.x + 8, n.y);
         },
       };
-      return { lines: ['Mama: Und denkt an eure Jacken!'] };
+      if (game.mama === 1) return { lines: [`${M}: Oma Hildes Garten ist im Südwesten. Das Gartentor ist leider abgeschlossen.`] };
+      const extra = !game.rec.theo && game.starter !== 'theo'
+        ? [`${M}: Theo? Der spielt wieder Verstecken. Bestimmt in irgendeinem Busch!`] : [];
+      return {
+        lines: [
+          asFried ? 'Friedrich: Mama, ich geh zum Buttenberg! Mit den Großen!' : `${L}: Darf Friedrich mitkommen? Wir gehen zum Buttenberg!`,
+          `${M}: Zum Buttenberg? Nur wenn ihr zusammenbleibt – und Friedrich seinen Tarnumhang mitnimmt.`,
+          `${M}: Aber der ist gestern über den Zaun in Oma Hildes Garten geweht. Und Oma Hilde ist verreist...`,
+          ...extra,
+        ],
+        after() { game.mama = 1; fx.banner('NEUE QUEST', 'Hol den Tarnumhang aus dem Garten', '#88e0ff'); },
+      };
+    }
 
     case 'friedrich':
-      if (s < 3) return { lines: [
-        'Friedrich: Theo, ich will auch mit! Bitte, bitte, bitte!',
-        'Theo: Erst brauche ich Felix und Arne. Dann sehen wir weiter.',
+      if (game.mama === 2) return {
+        lines: [`${L}: Kommst du?`, 'Friedrich: JAAA!'],
+        after() { game.rec.friedrich = true; fx.join('friedrich'); fx.banner('FRIEDRICH IST DABEI', 'B: unsichtbar werden (Laden)', '#a8f070'); },
+      };
+      return { lines: [
+        'Friedrich: Ich will auch mit! Bitte, bitte, bitte!',
+        `Friedrich: Aber ${game.starter === 'theo' ? 'Mama' : 'meine Mama'} erlaubt es nur mit meinem Tarnumhang. Frag sie!`,
       ] };
-      return { lines: ['Friedrich: Frag Mama! Ich hab schon meine Schuhe an!'] };
 
     case 'lotte': {
-      if (!game.owned.shield) return { lines: [
+      if (!game.owned.shield && !game.owned.strength && !game.owned.dig && !game.owned.invis) return { lines: [
         'Lotte: Diamanten? Die verdienst du bei Frau Klug in der Schule – im Süden, das Haus mit dem Buch.',
         'Lotte: Und gleich daneben ist Brunos Laden. Da gibt es Schilde, Zaubertränke und noch viel mehr!',
       ] };
-      const tips = [
-        'Lotte: Felix? Der übt gerade Kastanien-Weitwurf vor seinem Haus.',
-        'Lotte: Felix? Der übt gerade Kastanien-Weitwurf vor seinem Haus.',
-        'Lotte: Arne sitzt fest – seit dem Sturm liegt ein Felsbrocken vor seiner Tür! Wer stark ist, schiebt ihn zur Seite.',
-        'Lotte: Deine Mama hat vorhin nach Friedrich gerufen.',
-        'Lotte: Oma Hildes Garten? Die Erde unter dem Zaun ist ganz locker...',
-        'Lotte: Ein Tarnumhang? Na, dann schnell zu deiner Mama!',
-        'Lotte: Konrad lässt niemanden durch. Aber wen er nicht sieht, den hält er auch nicht auf...',
-        'Lotte: Viel Glück im Buttenberg! Brunos Schleuder soll gegen Schleime super helfen.',
-      ];
-      return { lines: [tips[s]] };
+      const r = game.rec;
+      const key = game.step >= 7 ? 'done' : !r.felix ? 'felix' : !r.theo ? 'theo' : !r.arne ? 'arne' : game.mama < 2 ? 'mama' : 'gate';
+      return { lines: [LOTTE_TIPS[key]] };
     }
 
     case 'teacher':
       return { lines: game.quizIntro ? ['Frau Klug: Schön, dass du wieder da bist! Welches Fach?'] : [
-        'Frau Klug: Hallo Theo! Du willst Diamanten verdienen? Dann zeig mal, was du kannst.',
+        `Frau Klug: Hallo ${L}! Du willst Diamanten verdienen? Dann zeig mal, was du kannst.`,
         'Frau Klug: Für jede richtige Antwort gibt es einen Diamanten. Fünf richtige in Folge geben 2 extra!',
       ], after() { game.quizIntro = true; fx.openQuiz(); } };
+
+    case 'jelly':
+      return fx.jellyTalk();
 
     case 'bruno':
       return { lines: ['Händler Bruno: Willkommen in Brunos Wunderladen! Was darf\'s sein?'], after() { fx.openShop(); } };
@@ -233,7 +291,7 @@ export function talkTo(n, game, fx) {
       return { lines: ['Troll: GRRR! Hier kommt keiner durch, den ich sehe!'] };
 
     case 'konrad':
-      if (game.world.gateOpen) return { lines: ['Wache Konrad: Vier kleine Helden... Passt bloß auf euch auf am Buttenberg!'] };
+      if (game.step >= 7) return { lines: ['Wache Konrad: Vier kleine Helden... Passt bloß auf euch auf am Buttenberg!'] };
       return { lines: [
         'Wache Konrad: Halt! Zum Buttenberg lasse ich keine Kinder durch.',
         'Wache Konrad: Da oben wohnt ein Drache! Das Tor bleibt zu.',
@@ -243,26 +301,29 @@ export function talkTo(n, game, fx) {
 }
 
 export function arneDoor(game, fx) {
+  const L = lead(game);
   return {
     lines: [
       '*klopf klopf*',
       'Arne: Endlich! Seit dem Sturm lag der Fels vor meiner Tür. Danke, Felix!',
-      'Theo: Kommst du mit zum Buttenberg? Wir besiegen den Drachen!',
+      `${L}: Kommst du mit zum Buttenberg? Wir besiegen den Drachen!`,
       'Arne: Klar! Und wenn wir irgendwo nicht weiterkommen – ich buddel uns einfach ein Loch.',
     ],
     after() {
+      game.rec.arne = true;
       fx.join('arne');
-      game.step = 3;
       fx.sfx.item();
-      fx.banner('ARNE IST DABEI', 'B: Löcher buddeln', '#a8f070');
+      fx.banner('ARNE IST DABEI', 'B: Löcher buddeln (Laden)', '#a8f070');
       fx.gainXP(15);
     },
   };
 }
 
-export const LEVER_DIALOG = [
-  '*Knarz!* Friedrich zieht am Hebel. Das Tor geht auf!',
-  'Wache Konrad: Huch?! Wer hat denn das Tor geöffnet?!',
-  'Theo: Wir! Wir sind zu viert und wir haben einen Plan.',
-  'Wache Konrad: ...Na gut, ihr kleinen Helden. Aber passt auf euch auf!',
-];
+export function leverDialog(game) {
+  return [
+    '*Knarz!* Friedrich zieht am Hebel. Das Tor geht auf!',
+    'Wache Konrad: Huch?! Wer hat denn das Tor geöffnet?!',
+    `${starterName(game)}: Wir! Wir sind zu viert und wir haben einen Plan.`,
+    'Wache Konrad: ...Na gut, ihr kleinen Helden. Aber passt auf euch auf!',
+  ];
+}

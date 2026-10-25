@@ -5,7 +5,7 @@ import {
   drawHouse, drawFountain, drawStall, drawLever, drawSign, drawHouseSign, drawTorch, drawStatue,
   drawBlackboard, drawDesk, drawShelf, drawCounter, drawBarrel, drawPlant, drawWindow,
   drawPumpkin, drawGrave, drawCandle, drawWallBat, drawWallSpider, drawCauldron, drawDeadTree,
-  drawChest, drawSearchlight, drawSpitter, drawBrazier,
+  drawChest, drawSearchlight, drawSpitter, drawBrazier, drawCage,
 } from './world.js';
 
 function addObj(b, o, draw, sortY) {
@@ -539,6 +539,130 @@ export function createUnder() {
     [21, 9, 26, 14, 22 * TILE, 11 * TILE, 3],
     [13, 2, 19, 5, 18 * TILE, 3 * TILE, 2],
     [3, 3, 8, 8, 7 * TILE, 8 * TILE, 1],
+  ];
+  return map;
+}
+
+// --- Kapitel 5: Der Bergpfad (nach Theos Skizze "Level 5") --------------------------
+//
+// Eingang (unten, Fledermäuse) → Pfad mit Bergtrollen → Platz: links Felsbrocken (Felix), rechts
+// Feuer spuckende Statue (Theo) → Erdmauer (Arne) → Kammer mit Bergtrollen, Apfel und SCHLÜSSEL
+// Links: gewundener Pfad mit schlafenden Felsmonstern → Bergkessel (Felsmonster, Diamanten)
+// → Riesiges Felsmonster (Boss) → Höhleneingang → Höhle der Felsmonster: Jelly im Käfig,
+// verschlossene Tür (Schlüssel) → Schlucht (nur Jelly springt) → weiter zum Drachen.
+
+export const MOUNTAIN_SPAWN = { x: 13 * TILE + 8, y: 42 * TILE, dir: 1 };
+export const LAIR_SPAWN = { x: 13 * TILE, y: 14 * TILE, dir: 1 };
+
+export function createMountain() {
+  const { map, b } = makeMap({ id: 'mountain', w: 30, h: 46, fill: T.CLIFF, edge: T.CLIFF, theme: 'valley' });
+  const G = (x, y, w, h) => b.rect(x, y, w, h, T.GRASS);
+  G(7, 2, 16, 1); G(6, 3, 18, 4); G(7, 7, 16, 1);   // Kessel des Riesen-Felsmonsters
+  b.set(14, 1, T.CAVEIN);                            // Höhleneingang
+  G(8, 8, 14, 1);
+  G(5, 9, 19, 6); G(6, 15, 9, 1);                    // Bergkessel mit schlafenden Felsmonstern
+  G(9, 16, 2, 3);
+  G(4, 19, 7, 2); G(4, 21, 2, 6); G(4, 27, 1, 1);    // gewundener Pfad (links)
+  G(3, 28, 16, 3);                                   // Platz
+  b.under(4, 28, T.GRASS); b.set(4, 28, T.BOULDER);  // Felsbrocken vor dem Pfad (Felix)
+  G(17, 19, 1, 9);                                   // Statuengang
+  b.set(18, 19, T.EWALL);                            // Erdmauer (Arne)
+  G(19, 17, 8, 5);                                   // Schlüsselkammer
+  G(12, 31, 4, 8);                                   // Pfad vom Eingang
+  G(7, 39, 14, 1); G(6, 40, 16, 4); G(7, 44, 14, 1); // Eingang
+  b.rect(13, 28, 2, 11, T.PATH); b.rect(13, 39, 2, 5, T.PATH);
+  b.rect(9, 16, 2, 3, T.PATH);
+  b.set(13, 44, T.UP); b.set(14, 44, T.UP);          // zurück ins Tal der Trolle
+
+  const r = rng(55);
+  for (let i = 0; i < 40; i++) {
+    const x = 3 + ((r() * 24) | 0), y = 2 + ((r() * 42) | 0);
+    if (map.tile(x, y) === T.GRASS) b.set(x, y, T.FLOWER);
+  }
+  for (const [x, y] of [[9, 3], [20, 3], [9, 6], [20, 6], [14, 5]]) b.set(x, y, T.DIG); // Gruben für den Boss
+  for (const [x, y] of [[9, 10], [12, 13], [17, 12], [20, 14], [16, 9], [6, 30], [18, 28], [3, 30], [26, 21], [6, 43], [21, 42]]) b.set(x, y, T.ROCK);
+  for (const [x, y] of [[8, 40], [20, 40], [12, 37], [15, 32]]) b.set(x, y, T.BUSH);
+
+  map.statue = addObj(b, { type: 'statue', x: 17, y: 21, alive: true }, drawStatue);
+  b.solid(17, 21);
+  map.killStatue = () => { map.statue.alive = false; map.block[21][17] = false; };
+
+  map.warps.push({ x: 14, y: 1, to: 'lair', tx: LAIR_SPAWN.x, ty: LAIR_SPAWN.y, dir: 1 });
+  for (const x of [13, 14]) map.warps.push({ x, y: 44, to: 'valley', tx: 15 * TILE + 8, ty: 3 * TILE, dir: 0 });
+  map.arena = { x0: 6 * TILE, y0: 2 * TILE, x1: 22 * TILE, y1: 7 * TILE };
+
+  const item = (type, x, y, id) => map.items.push({ id, type, x: x * TILE + 2, y: y * TILE + 2, taken: false });
+  item('key', 26, 19, 'mkey'); item('apple', 25, 17, 'm1'); item('crystal', 19, 21, 'm2');
+  item('crystal', 6, 10, 'm3'); item('crystal', 6, 13, 'm4'); item('crystal', 22, 9, 'm5'); item('apple', 22, 14, 'm6');
+  item('apple', 5, 22, 'm7'); item('bag', 18, 30, 'm8');
+
+  map.enemySpawns = [
+    { type: 'bat', x: 9, y: 41 }, { type: 'bat', x: 19, y: 41 },
+    { type: 'mtroll', x: 12, y: 35 }, { type: 'mtroll', x: 15, y: 33 },
+    { type: 'mtroll', x: 21, y: 18 }, { type: 'mtroll', x: 24, y: 20 },
+    { type: 'rockmon', x: 8, y: 19, asleep: true },
+    { type: 'rockmon', x: 7, y: 12, asleep: true }, { type: 'rockmon', x: 11, y: 11, asleep: true },
+    { type: 'rockmon', x: 15, y: 13, asleep: true }, { type: 'rockmon', x: 18, y: 10, asleep: true },
+    { type: 'rockmon', x: 21, y: 12, asleep: true },
+    { type: 'rockboss', x: 14, y: 4 },
+  ];
+
+  map.hints = [
+    [6, 39, 21, 44, 'Der Bergpfad! Ganz oben halten Felsmonster eine Katze gefangen.'],
+    [3, 28, 18, 30, 'Links versperrt ein Felsbrocken den Pfad (Felix). Rechts spuckt eine Statue Feuer (Theo).'],
+    [17, 22, 17, 27, 'Halte Theos Schild hoch und wirf das Feuer zur Statue zurück!'],
+    [17, 19, 17, 20, 'Eine Erdmauer! Ein Fall für Arne.'],
+    [19, 17, 26, 21, 'Bergtrolle! Und da hinten glänzt ein Schlüssel ...'],
+    [4, 19, 10, 26, 'Psst! Schlafende Felsmonster. Wer zu nah kommt, weckt sie. Friedrich kann unsichtbar vorbei.'],
+    [6, 2, 23, 7, 'Das Riesen-Felsmonster! Lockt es in ein Loch, das Arne gräbt – steckt es fest, schnell das Schwert!'],
+  ];
+  map.checkpoints = [
+    [6, 39, 21, 44, MOUNTAIN_SPAWN.x, MOUNTAIN_SPAWN.y, 1],
+    [3, 28, 18, 30, 13 * TILE, 29 * TILE, 1],
+    [19, 17, 26, 21, 19 * TILE, 19 * TILE, 3],
+    [4, 19, 10, 26, 4 * TILE, 26 * TILE, 1],
+    [5, 9, 23, 15, 9 * TILE + 8, 16 * TILE, 1],
+    [6, 2, 23, 8, 14 * TILE, 8 * TILE, 1],
+  ];
+  return map;
+}
+
+export function createLair() {
+  const { map, b } = makeMap({ id: 'lair', w: 26, h: 18, fill: T.CWALL, edge: T.CWALL, theme: 'cave' });
+  const carve = (x, y, w, h) => b.rect(x, y, w, h, T.CFLOOR);
+  carve(5, 3, 18, 13);                       // Höhle der Felsmonster
+  carve(13, 16, 1, 1); b.set(13, 16, T.UP);  // zurück zum Bergpfad
+  b.set(4, 4, T.LOCKED);                     // verschlossene Tür
+  carve(1, 1, 3, 6);                         // Felsvorsprung
+  b.rect(1, 3, 3, 1, T.CHASM);               // Schlucht
+  b.set(2, 1, T.UP);                         // weiter zum Drachen
+  map.warps.push({ x: 13, y: 16, to: 'mountain', tx: 14 * TILE, ty: 2 * TILE + 4, dir: 0 });
+  for (const [x, y] of [[6, 15], [22, 15], [11, 8], [19, 5], [3, 6]]) b.set(x, y, T.MUSH);
+  for (const [x, y] of [[7, 2], [19, 2], [2, 0]]) addObj(b, { type: 'torch', x, y }, drawTorch, 0);
+
+  map.cage = addObj(b, { type: 'cage', x: 12, y: 3, w: 2, open: false }, drawCage, 4 * TILE + 1);
+  b.solid(12, 3, 2, 1);
+  map.npcs.push({ id: 'jelly', pal: 'jelly', x: 12 * TILE + 8, y: 3 * TILE, dir: 0, anim: 0, moving: false });
+
+  const item = (type, x, y, id) => map.items.push({ id, type, x: x * TILE + 2, y: y * TILE + 2, taken: false });
+  for (const [x, y, id] of [[21, 4, 'l1'], [21, 6, 'l2'], [21, 8, 'l3'], [20, 10, 'l4'], [21, 13, 'l5'], [6, 5, 'l6']]) item('crystal', x, y, id);
+  item('apple', 6, 8, 'l7'); item('apple', 18, 14, 'l8');
+
+  map.enemySpawns = [
+    { type: 'rockmon', x: 9, y: 4, guard: true }, { type: 'rockmon', x: 16, y: 4, guard: true },
+    { type: 'rockmon', x: 8, y: 10, asleep: true }, { type: 'rockmon', x: 12, y: 11, asleep: true },
+    { type: 'rockmon', x: 17, y: 9, asleep: true }, { type: 'rockmon', x: 19, y: 12, asleep: true },
+    { type: 'rockmon', x: 7, y: 13, asleep: true }, { type: 'rockmon', x: 15, y: 13, asleep: true },
+  ];
+
+  map.hints = [
+    [5, 10, 22, 15, 'Die Höhle der Felsmonster. Leise – hier schlafen ganz viele ...'],
+    [5, 3, 22, 7, 'Da ist die Katze im Käfig! Zwei Felsmonster bewachen sie.'],
+    [1, 4, 3, 6, 'Eine tiefe Schlucht! Hier kommt nur rüber, wer springen kann ...'],
+  ];
+  map.checkpoints = [
+    [5, 3, 22, 15, LAIR_SPAWN.x, LAIR_SPAWN.y, 1],
+    [1, 4, 3, 6, 3 * TILE, 5 * TILE, 1],
   ];
   return map;
 }

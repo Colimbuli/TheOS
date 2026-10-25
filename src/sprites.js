@@ -104,6 +104,7 @@ function render(map, pal, flip) {
 // dir: 0 runter, 1 hoch, 2 links, 3 rechts · frame: 0 stehen, 1/2 Schritt.
 // Liefert ein Canvas, dessen Unterkante auf den Füßen liegt (Höhe 14–18 px).
 export function charSprite(palName, dir, frame) {
+  if (palName === 'jelly') return catSprite(dir, frame);
   const key = `${palName}:${dir}:${frame}`;
   let c = cache.get(key);
   if (c) return c;
@@ -358,5 +359,125 @@ export function swordIcon() {
   return canvasSprite('swordicon', 12, 12, (px) => {
     for (let i = 0; i < 8; i++) { px('#d8d8e8', 3 + i, 8 - i, 1, 1); px('#ffffff', 4 + i, 8 - i, 1, 1); }
     px('#6a4a2a', 1, 8, 4, 2); px('#6a4a2a', 2, 7, 2, 4); px('#f0c838', 1, 10, 2, 2);
+  });
+}
+
+// --- Kapitel 5: Der Bergpfad ------------------------------------------------------
+
+// Jelly: graue Katze mit weißer Brust, türkisem Halsband und Glöckchen (eigenes Design)
+const CAT = { o: '#1a1020', f: '#9aa4b8', d: '#6a7488', l: '#c8d0dc', w: '#f4f4f8', e: '#58d070', n: '#f08aa0', c: '#30b8b0', b: '#f0c838' };
+
+export function catSprite(dir, frame) {
+  const side = dir >= 2;
+  return canvasSprite(`cat${side ? 's' : dir}${frame}${dir === 2 ? 'L' : ''}`, 16, 16, (pxRaw, ell) => {
+    const flip = dir === 2;
+    const px = (c, x, y, w = 1, h = 1) => { for (let i = 0; i < w; i++) pxRaw(c, flip ? 15 - (x + i) : x + i, y, 1, h); };
+    const E = (cx, cy, rx, ry, fn) => ell(flip ? 16 - cx : cx, cy, rx, ry, fn);
+    const step = frame === 1 ? 1 : frame === 2 ? -1 : 0;
+    if (!side) {
+      const front = dir === 0;
+      // Schwanz
+      if (front) { px(CAT.o, 13, 8, 2, 5); px(CAT.d, 13, 9, 1, 3); }
+      else { px(CAT.o, 7, 3, 3, 6); px(CAT.f, 8, 4, 1, 5); px(CAT.d, 8, 3, 1, 1); }
+      // Körper
+      E(8, 12, 5, 3.6, (dx, dy, d) => (d > 0.72 ? CAT.o : front && Math.abs(dx) < 0.35 && dy < 0.5 ? CAT.w : dx < -0.3 ? CAT.l : CAT.f));
+      // Pfoten
+      px(CAT.o, 4, 14, 3, 2); px(CAT.w, 5, 14 + (step > 0 ? -1 : 0), 1, 1);
+      px(CAT.o, 9, 14, 3, 2); px(CAT.w, 10, 14 + (step < 0 ? -1 : 0), 1, 1);
+      // Kopf
+      E(8, 5.5, 5.4, 4.4, (dx, dy, d) => (d > 0.74 ? CAT.o : front && dy > 0.3 && Math.abs(dx) < 0.45 ? CAT.w : dx < -0.35 && dy < 0 ? CAT.l : CAT.f));
+      px(CAT.o, 3, 0, 2, 3); px(CAT.f, 4, 1, 1, 2); px(CAT.n, 4, 2, 1, 1);
+      px(CAT.o, 11, 0, 2, 3); px(CAT.f, 11, 1, 1, 2); px(CAT.n, 11, 2, 1, 1);
+      if (front) {
+        px(CAT.d, 6, 2, 1, 2); px(CAT.d, 8, 2, 1, 2); px(CAT.d, 10, 2, 1, 2); // Streifen
+        px(CAT.e, 5, 5, 2, 2); px(CAT.o, 6, 5, 1, 2); px(CAT.e, 9, 5, 2, 2); px(CAT.o, 9, 5, 1, 2);
+        px(CAT.n, 7, 7, 2, 1); px(CAT.o, 7, 8, 2, 1);
+        px(CAT.c, 4, 9, 8, 1); px(CAT.b, 7, 10, 2, 1);
+      } else {
+        px(CAT.d, 6, 3, 1, 3); px(CAT.d, 8, 2, 1, 4); px(CAT.d, 10, 3, 1, 3);
+        px(CAT.c, 4, 9, 8, 1);
+      }
+      return;
+    }
+    // Seitenansicht (nach rechts; links wird gespiegelt)
+    px(CAT.o, 0, 4, 2, 7); px(CAT.f, 1, 5, 1, 5); px(CAT.d, 1, 4, 1, 1);  // Schwanz
+    E(7, 10.5, 6.2, 3.4, (dx, dy, d) => (d > 0.72 ? CAT.o : dy > 0.4 && dx > 0 ? CAT.w : dy < -0.3 ? CAT.l : CAT.f));
+    px(CAT.d, 5, 8, 1, 2); px(CAT.d, 8, 8, 1, 2);
+    const legs = [[3, step], [5, -step], [9, -step], [11, step]];
+    for (const [x, o] of legs) { px(CAT.o, x, 13, 2, 3); px(x < 7 ? CAT.d : CAT.f, x, 13 + Math.max(0, o), 1, 2 - Math.max(0, o)); }
+    E(12, 6, 4.2, 3.8, (dx, dy, d) => (d > 0.72 ? CAT.o : dx > 0.3 && dy > 0.2 ? CAT.w : dy < -0.3 ? CAT.l : CAT.f));
+    px(CAT.o, 9, 1, 2, 3); px(CAT.f, 10, 2, 1, 1);
+    px(CAT.o, 13, 1, 2, 3); px(CAT.n, 13, 2, 1, 1);
+    px(CAT.e, 13, 5, 2, 2); px(CAT.o, 14, 5, 1, 2);
+    px(CAT.n, 15, 7, 1, 1);
+    px(CAT.c, 10, 9, 4, 1); px(CAT.b, 12, 10, 1, 1);
+  });
+}
+
+// Bergtroll: kleiner, moosgrüner Troll mit Hauern und Fellschurz
+export function mtrollSprite(flip, frame) {
+  return canvasSprite(`mtroll${flip}${frame}`, 16, 16, (px, ell) => {
+    const f = (x) => (flip ? 15 - x : x);
+    const P = (c, x, y, w = 1, h = 1) => { for (let i = 0; i < w; i++) px(c, f(x + i), y, 1, h); };
+    P('#1a1020', 4, 13, 3, 3); P('#1a1020', 9, 13, 3, 3);
+    P('#5a6a3a', 5, 13 + (frame ? 1 : 0), 1, 2); P('#5a6a3a', 10, 13 + (frame ? 0 : 1), 1, 2);
+    ell(8, 9.5, 6.5, 4.5, (dx, dy, d) => (d > 0.75 ? '#1a1020' : dy > 0.3 ? '#7a5a3a' : dx < -0.3 ? '#a0b070' : '#7a8a4a'));
+    P('#5a3a20', 3, 11, 10, 1);
+    ell(8, 5, 5.5, 4.5, (dx, dy, d) => (d > 0.75 ? '#1a1020' : dx < -0.3 && dy < 0 ? '#b0c080' : '#8a9a5a'));
+    P('#1a1020', 7, 5, 2, 3); P('#6a7a3a', 7, 5, 2, 2); // Nase
+    P('#ffffff', 4, 4, 2, 1); P('#1a1020', 5, 4); P('#ffffff', 10, 4, 2, 1); P('#1a1020', 10, 4);
+    P('#2a3a1a', 4, 3, 2, 1); P('#2a3a1a', 10, 3, 2, 1);
+    P('#f0f0e0', 5, 8, 1, 1); P('#f0f0e0', 10, 8, 1, 1);
+    P('#1a1020', 13, frame ? 6 : 8, 2, 4); P('#8a9a5a', 13, frame ? 7 : 9, 1, 2);
+  });
+}
+
+// Felsmonster: runder Fels mit Gesicht, Armen und kurzen Beinen. Schlafend ohne Arme.
+export function rockmonSprite(awake, frame) {
+  return canvasSprite(`rockmon${awake}${frame}`, 16, 16, (px, ell) => {
+    const stone = (dx, dy, d) => (d > 0.76 ? '#2a2430' : (dx + dy < -0.6) ? '#c4bcc8' : (dx + dy > 0.6) ? '#5e5664' : '#8e8696');
+    if (awake) { px('#2a2430', 4, 13, 3, 3); px('#2a2430', 9, 13, 3, 3); px('#6e6676', 5, 13, 1, 2); px('#6e6676', 10, 13, 1, 2); }
+    ell(8, awake ? 8 : 10, 6.8, awake ? 6.2 : 5.4, stone);
+    if (awake) {
+      const ay = frame ? 4 : 7;
+      px('#2a2430', 0, ay, 3, 5); px('#8e8696', 1, ay + 1, 1, 3);
+      px('#2a2430', 13, ay, 3, 5); px('#8e8696', 14, ay + 1, 1, 3);
+      px('#1a1020', 4, 5, 3, 1); px('#1a1020', 9, 5, 3, 1);            // Brauen
+      px('#ffffff', 5, 6, 2, 2); px('#ff4a3a', 6, 7); px('#ffffff', 9, 6, 2, 2); px('#ff4a3a', 9, 7);
+      px('#1a1020', 5, 10, 6, 2); px('#f0f0e0', 6, 10, 1, 1); px('#f0f0e0', 9, 10, 1, 1);
+    } else {
+      px('#2a2430', 5, 9, 2, 1); px('#2a2430', 9, 9, 2, 1);            // geschlossene Augen
+      px('#2a2430', 7, 12, 2, 1);
+    }
+    px('#4a4250', 11, 4 + (awake ? 0 : 3), 1, 3); px('#4a4250', 3, 8 + (awake ? 0 : 2), 2, 1); // Risse
+    ell(5, awake ? 4 : 7, 1.5, 1, '#3e8a3a');                                // Moos
+  });
+}
+
+// Riesiges Felsmonster (Boss), 32x32
+export function rockBossSprite(mode, frame) {
+  return canvasSprite(`rockboss${mode}${frame}`, 32, 32, (px, ell) => {
+    const stone = (dx, dy, d) => (d > 0.84 ? '#221c28' : (dx + dy < -0.7) ? '#cac2ce' : (dx + dy > 0.6) ? '#5a5260' : '#8e8696');
+    px('rgba(0,0,0,0.3)', 5, 29, 22, 3);
+    px('#221c28', 8, 24, 6, 7); px('#221c28', 18, 24, 6, 7); px('#6e6676', 9, 25, 3, 5); px('#6e6676', 19, 25, 3, 5);
+    ell(16, 15, 12.5, 11.5, stone);
+    const up = mode === 'wind' ? (frame ? 2 : 6) : mode === 'stuck' ? 14 : frame ? 9 : 12;
+    // Arme mit Fäusten
+    px('#221c28', 0, up, 6, 11); px('#8e8696', 1, up + 1, 4, 9); px('#cac2ce', 1, up + 1, 1, 6);
+    px('#221c28', 26, up, 6, 11); px('#8e8696', 27, up + 1, 4, 9);
+    ell(3, up + 12, 3.2, 2.8, stone); ell(29, up + 12, 3.2, 2.8, stone);
+    if (mode === 'stuck') {
+      px('#221c28', 9, 11, 4, 1); px('#221c28', 19, 11, 4, 1);
+      px('#ffffff', 10, 12, 3, 2); px('#ffffff', 19, 12, 3, 2); px('#221c28', 11, 13); px('#221c28', 20, 13);
+      ell(16, 20, 3, 2.4, '#221c28');
+    } else {
+      px('#221c28', 8, 9, 6, 2); px('#221c28', 18, 9, 6, 2);
+      px('#ffffff', 9, 11, 4, 3); px('#ffffff', 19, 11, 4, 3);
+      px(mode === 'charge' ? '#ff3a2a' : '#c83a2a', 11, 12, 2, 2); px(mode === 'charge' ? '#ff3a2a' : '#c83a2a', 19, 12, 2, 2);
+      px('#221c28', 10, 18, 12, 4);
+      for (const x of [11, 14, 17, 20]) px('#f0f0e0', x, 18, 1, 2);
+    }
+    px('#4a4250', 23, 5, 1, 5); px('#4a4250', 24, 9, 2, 1); px('#4a4250', 6, 17, 3, 1);
+    ell(10, 5, 3, 1.6, '#3e8a3a'); ell(22, 24, 2.4, 1.2, '#3e8a3a');
   });
 }

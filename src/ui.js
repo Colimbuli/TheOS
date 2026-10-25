@@ -4,6 +4,7 @@
 import { SUBJECTS, nextQuestion } from './quiz.js';
 import { CATALOG, itemState, buy } from './shop.js';
 import { drawDiamond } from './world.js';
+import { charSprite } from './sprites.js';
 
 const W = 240, H = 160;
 
@@ -308,7 +309,8 @@ export class RiddleUI {
 
 // --- Pause-Menü: Speichern, Laden, Speichercode ------------------------------------
 
-const MAP_NAMES = { village: 'Lindental', school: 'Schule', shop: 'Brunos Laden', cave: 'Höhle', haunted: 'Spukhaus' };
+const MAP_NAMES = { village: 'Lindental', school: 'Schule', shop: 'Brunos Laden', cave: 'Höhle', haunted: 'Spukhaus',
+  valley: 'Tal der Trolle', under: 'Unterwelt', mountain: 'Bergpfad', lair: 'Felsmonster-Höhle' };
 
 function slotLabel(d) {
   if (!d) return { name: '– leer –', info: '' };
@@ -420,7 +422,7 @@ export class ChapterUI {
     const n = this.chapters.length + 1;
     const d = this.nav(input, dt);
     if (d) { this.sel = (this.sel + d + n) % n; this.fx.sfx.blip(); }
-    for (let i = 0; i < n; i++) if (hit(tap, 24, 30 + i * 22, 192, 20)) { this.sel = i; input.aPressed = true; }
+    for (let i = 0; i < n; i++) if (hit(tap, 24, 22 + i * 19, 192, 17)) { this.sel = i; input.aPressed = true; }
     if (input.bPressed || input.menuPressed) { this.closed = true; return; }
     if (input.aPressed) {
       this.closed = true;
@@ -432,15 +434,63 @@ export class ChapterUI {
     panel(g);
     text('Kapitel wählen', 9, 7, { size: 6, color: '#f8d848' });
     [...this.chapters, { name: 'Zurück' }].forEach((c, i) => {
-      const y = 30 + i * 22, sel = i === this.sel;
-      g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(24, y, 192, 20);
-      if (sel) { g.fillStyle = '#f8d848'; g.fillRect(24, y, 2, 20); }
+      const y = 22 + i * 19, sel = i === this.sel;
+      g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(24, y, 192, 17);
+      if (sel) { g.fillStyle = '#f8d848'; g.fillRect(24, y, 2, 17); }
       if (c.n) {
-        text(`Kapitel ${c.n}`, 34, y + 3, { size: 5, color: '#f8d848' });
-        text(c.name, 34, y + 11, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
-      } else text(c.name, 34, y + 7, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
+        text(`${c.n}`, 34, y + 6, { size: 6, color: '#f8d848' });
+        text(c.name, 50, y + 6, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
+      } else text(c.name, 34, y + 6, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
     });
     text('Startet mit allen Fähigkeiten bis dahin', W / 2, 142, { size: 5, align: 'center', color: '#a8b8d8' });
     text('A: starten   B: zurück', W / 2, 151, { size: 5, align: 'center', color: '#8898c0' });
+  }
+}
+
+// --- Startfigur wählen ---------------------------------------------------------------
+
+const STARTER_INFO = [
+  { id: 'theo', name: 'Theo', info: 'Schutzschild · hat den großen Plan' },
+  { id: 'felix', name: 'Felix', info: 'Superstärke · der Größte' },
+  { id: 'arne', name: 'Arne', info: 'Graben · Locken und Sakko' },
+  { id: 'friedrich', name: 'Friedrich', info: 'Unsichtbar · der Kleinste' },
+];
+
+export class StarterUI {
+  constructor(game, fx, onPick) {
+    this.game = game; this.fx = fx; this.onPick = onPick;
+    this.sel = 0; this.nav = navigator(); this.closed = false;
+  }
+
+  update(input, dt, tap) {
+    const n = STARTER_INFO.length + 1;
+    const d = this.nav(input, dt);
+    if (d) { this.sel = (this.sel + d + n) % n; this.fx.sfx.blip(); }
+    for (let i = 0; i < n; i++) if (hit(tap, 16, this.rowY(i), 208, i < 4 ? 24 : 14)) { this.sel = i; input.aPressed = true; }
+    if (input.bPressed || input.menuPressed) { this.closed = true; return; }
+    if (input.aPressed) {
+      this.closed = true;
+      if (this.sel < STARTER_INFO.length) this.onPick(STARTER_INFO[this.sel].id);
+    }
+  }
+
+  rowY(i) { return 24 + i * 27; }
+
+  render(g, text) {
+    panel(g);
+    text('Mit wem startest du?', 9, 7, { size: 6, color: '#f8d848' });
+    STARTER_INFO.forEach((c, i) => {
+      const y = this.rowY(i), sel = i === this.sel;
+      g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(16, y, 208, 24);
+      if (sel) { g.fillStyle = '#f8d848'; g.fillRect(16, y, 2, 24); }
+      const spr = charSprite(c.id, 0, sel ? Math.floor(Date.now() / 200) % 3 : 0);
+      g.drawImage(spr, 24, y + 22 - spr.height);
+      text(c.name, 46, y + 4, { size: 7, color: sel ? '#ffffff' : '#c8d0e8' });
+      text(c.info, 46, y + 14, { size: 5, color: '#a8b8d8' });
+    });
+    const y = this.rowY(4), sel = this.sel === 4;
+    g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(16, y, 208, 14);
+    text('Zurück', 26, y + 4, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
+    text('Die anderen musst du erst überzeugen!', W / 2, 151, { size: 5, align: 'center', color: '#a8f070' });
   }
 }
