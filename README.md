@@ -1,5 +1,9 @@
 # TheOS – Theo und der Drache vom Buttenberg
 
+> **Based on the Pokemon Gen 1 Recompilation Project by BOIS CLUB GAMES, LLC
+> (https://github.com/bryanthaboi/gen1recomp)** – die 3D-Kippansicht ist eine Portierung von dessen
+> `Tilt.lua`. TheOS steht unter der GPLv3 mit den Zusatzbedingungen von gen1recomp, siehe `LICENSE.md`.
+
 Top-down-Abenteuer im Stil der GBA-Ära: questen, leveln, erkunden – und nebenbei lernen.
 Alle Grafiken und Sounds sind eigene Pixel-Art bzw. per Code erzeugt – keine fremden Assets.
 
@@ -63,6 +67,17 @@ Im Spiel öffnet **Esc / P** (Gamepad: Start, Touch: ☰) das Menü: 3 Speicherp
 zum Abschreiben (auch als Link: `?code=XXXX-XXXX-XXXX-XXXX-XXXX`). Über **Kapitel wählen** im Titelbild
 startet man jedes Kapitel direkt – mit allen Fähigkeiten, die man bis dahin hätte.
 
+## 3D-Ansicht
+
+Die Welt wird wie ein Diorama nach hinten gekippt (HD-2D-Look): Der Boden liegt perspektivisch,
+Häuser, Bäume, Zäune und Figuren stehen aufrecht und werden zum Horizont hin kleiner. Stufen
+**Aus / 15° / 35° / 50°** (Standard 35°) – umschalten mit **T** oder im Pause-Menü; die Einstellung
+merkt sich der Browser. Die Kippung wirkt nur auf die Darstellung, nicht auf Bewegung und Kollision.
+
+Die Projektion ist eine Portierung von `src/render/Tilt.lua` aus dem gen1recomp-Projekt (siehe oben
+und `LICENSE.md`). Weil der Browser hier ohne Shader arbeitet, wird der Boden zeilenweise exakt
+projiziert (`Tilt.warpGround` in `src/tilt.js`).
+
 ## Steuerung
 
 | Aktion | Tastatur | Gamepad | Touch |
@@ -97,10 +112,15 @@ Im HTML-Panel der Perchance-Seite:
 ```html
 <style>
   html, body { margin: 0; padding: 0; background: #0b0f1a; height: 100%; overflow: hidden; }
-  #theos { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+  #theos { position: fixed; inset: 0 0 18px 0; width: 100%; height: calc(100% - 18px); border: 0; display: block; }
+  #credit { position: fixed; left: 0; right: 0; bottom: 0; height: 18px; font: 11px sans-serif; color: #b8c8e8;
+    text-align: center; line-height: 18px; background: #0b0f1a; }
+  #credit a { color: #88c8ff; }
 </style>
 <iframe id="theos" src="https://colimbuli.github.io/TheOS/"
   allow="gamepad; fullscreen; autoplay" allowfullscreen></iframe>
+<div id="credit">Based on the Pokemon Gen 1 Recompilation Project by BOIS CLUB GAMES, LLC
+  (<a href="https://github.com/bryanthaboi/gen1recomp" target="_blank">github.com/bryanthaboi/gen1recomp</a>)</div>
 <script>document.getElementById('theos').addEventListener('load', e => e.target.focus());</script>
 ```
 
@@ -130,6 +150,7 @@ src/sprites.js    Figuren-, Gegner- und Gegenstands-Sprites
 src/dialog.js     Dialogbox mit Schreibmaschinen-Effekt
 src/input.js      Tastatur, Touch, Gamepad
 src/audio.js      Chiptune-Soundeffekte (WebAudio)
+src/tilt.js       3D-Kippansicht (portiert aus gen1recomp, GPLv3)
 ```
 
 Der frühere Ego-Perspektive-Prototyp (Raycaster) liegt auf dem Branch `fps-prototyp`.

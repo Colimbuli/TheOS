@@ -85,12 +85,12 @@ export function createVillage() {
   addObj(b, { type: 'hsign', x: 22, y: 18, icon: 'diamond' }, drawHouseSign, 21 * TILE);
 
   // Brunnen
-  addObj(b, { type: 'fountain', x: 15, y: 12 }, drawFountain, 14 * TILE);
+  addObj(b, { type: 'fountain', x: 15, y: 12, w: 2 }, drawFountain, 14 * TILE);
   b.solid(15, 12, 2, 2);
   for (const [x, y] of [[15, 12], [16, 12], [15, 13], [16, 13]]) b.say(x, y, ['Ein alter Brunnen. Das Wasser glitzert in der Sonne.']);
 
   // Marktstand
-  addObj(b, { type: 'stall', x: 20, y: 10 }, drawStall, 11 * TILE);
+  addObj(b, { type: 'stall', x: 20, y: 10, w: 2 }, drawStall, 11 * TILE);
   b.solid(20, 10, 2, 1);
   b.counter(20, 10); b.counter(21, 10);
 

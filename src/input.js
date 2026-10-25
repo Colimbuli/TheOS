@@ -8,6 +8,7 @@ const KEYMAP = {
   KeyJ: 'b', KeyK: 'b', KeyX: 'b',
   KeyQ: 'swap', Tab: 'swap',
   Escape: 'menu', KeyP: 'menu',
+  KeyT: 'tilt',
 };
 
 const kb = {};
@@ -19,7 +20,7 @@ let onGesture = () => {};
 export const input = {
   dir: { x: 0, y: 0 },
   a: false, b: false,
-  aPressed: false, bPressed: false, swapPressed: false, menuPressed: false,
+  aPressed: false, bPressed: false, swapPressed: false, menuPressed: false, tiltPressed: false,
   tapY: 0, // kurzer Tipp hoch/runter (für Menüs), auch wenn zwischen zwei Frames losgelassen
   device: 'keyboard',
 };
@@ -125,8 +126,9 @@ export function pollInput() {
   const menu = held('menu');
   input.menuPressed = (menu && !prevM) || !!latched.menu;
   prevM = menu;
+  input.tiltPressed = !!latched.tilt;
   input.tapY = latched.up ? -1 : latched.down ? 1 : 0;
-  latched.a = latched.b = latched.swap = latched.up = latched.down = latched.menu = false;
+  latched.a = latched.b = latched.swap = latched.up = latched.down = latched.menu = latched.tilt = false;
   if (input.aPressed || input.bPressed) onGesture();
   prevA = input.a;
   prevB = input.b;

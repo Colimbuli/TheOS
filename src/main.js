@@ -6,7 +6,8 @@
 
 import { initInput, pollInput, input, isTouch } from './input.js';
 import { sfx, unlockAudio } from './audio.js';
-import { drawTiles, T, TILE, COL, drawDiamond } from './world.js';
+import { drawTiles, T, TILE, COL, drawDiamond, TALL, tileCutout } from './world.js';
+import Tilt from './tilt.js';
 import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES, createValley, createUnder, VALLEY_SPAWN } from './maps.js';
 import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite, guardSprite, bomberSprite, bombSprite, rockSprite } from './sprites.js';
 import { createNPCs, talkTo, arneDoor, LEVER_DIALOG, HEROES, questHint, ABILITY_NAME } from './npcs.js';
@@ -294,7 +295,9 @@ let tapPos = null;
 
 function update(dt) {
   game.time += dt;
+  Tilt.update(dt);
   pollInput();
+  if (input.tiltPressed) cycleTilt();
   const tap = canvasTap;
   canvasTap = false;
   const tp = tapPos;
@@ -412,6 +415,8 @@ const PAUSE_API = {
     return { ok: true, text: '' };
   },
   toTitle() { save(); newGame(); dialog.active = false; },
+  tiltLabel: () => Tilt.levelLabel(),
+  cycleTilt: () => { Tilt.cycle(); Tilt.saveSetting(); },
 };
 
 // Aus den Werten eines Speichercodes einen vollständigen Spielstand bauen
@@ -436,6 +441,13 @@ function fromCode(c) {
     valley: { ...(c.valley || {}), edits: [], taken: [] },
     quizIntro: true, seenHints: {},
   };
+}
+
+function cycleTilt() {
+  Tilt.cycle();
+  Tilt.saveSetting();
+  sfx.blip();
+  if (game.state === 'play') fx.toast(`3D-Ansicht: ${Tilt.levelLabel()}`, 1.5);
 }
 
 function openPause(opts) { game.ui = new PauseUI(game, fx, PAUSE_API, opts); }
@@ -1562,101 +1574,138 @@ function bubble(e, cam) {
   g.fillStyle = '#e83848'; g.fillRect(sx + 3, sy + 2, 2, 4); g.fillRect(sx + 3, sy + 7, 2, 1);
 }
 
+// Projektion eines Punkts im normalen Bildschirmraum (ohne Kippung) → Bildschirm.
+// Liefert [x, y, scale]; ohne Kippansicht unverändert.
+function P(fx, fy) { return Tilt.active() ? Tilt.project(fx, fy, W, H) : [fx, fy, 1]; }
+
+let groundCanvas = null;
+function groundCtx(gw, gh) {
+  if (!groundCanvas || groundCanvas.width !== gw || groundCanvas.height !== gh) {
+    groundCanvas = document.createElement('canvas');
+    groundCanvas.width = gw; groundCanvas.height = gh;
+  }
+  const c = groundCanvas.getContext('2d');
+  c.imageSmoothingEnabled = false;
+  return c;
+}
+
+function drawSky(c, m, fc, vw) {
+  if (m.theme !== 'haunted' || fc.y >= 0) return;
+  // Sternenhimmel und Vollmond über dem Spukhaus
+  for (let i = 0; i < 60; i++) {
+    const sx = (i * 97 + 13) % vw, sy = ((i * 53) % 64) - 64 - fc.y;
+    if (sy < -fc.y) { c.fillStyle = i % 5 ? '#c8c8f0' : '#ffffff'; c.fillRect(sx, sy, 1, 1); }
+  }
+  const mx = vw - 40 - fc.x * 0.2, my = -30 - fc.y;
+  c.fillStyle = '#f8f0c8'; c.beginPath(); c.arc(mx, my, 11, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#e0d8a8'; c.fillRect(mx - 4, my - 3, 3, 3); c.fillRect(mx + 3, my + 2, 2, 2);
+}
+
 function renderWorld(cam) {
   const m = map();
-  g.fillStyle = m.theme === 'haunted' ? '#0c0a24' : '#000';
-  g.fillRect(0, 0, W, H);
-  if (m.theme === 'haunted' && cam.y < 0) {
-    // Sternenhimmel und Vollmond über dem Spukhaus
-    for (let i = 0; i < 40; i++) {
-      const sx = (i * 97 + 13) % W, sy = ((i * 53) % 48) - 48 - cam.y;
-      if (sy < -cam.y) { g.fillStyle = i % 5 ? '#c8c8f0' : '#ffffff'; g.fillRect(sx, sy, 1, 1); }
-    }
-    const mx = 200 - cam.x * 0.2, my = -30 - cam.y;
-    g.fillStyle = '#f8f0c8'; g.beginPath(); g.arc(mx, my, 11, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#e0d8a8'; g.fillRect(mx - 4, my - 3, 3, 3); g.fillRect(mx + 3, my + 2, 2, 2);
-  }
-  drawTiles(g, m, cam.x, cam.y, game.time);
+  const tilted = Tilt.active();
+  const bg = m.theme === 'haunted' ? '#0c0a24' : m.theme === 'valley' ? '#1c3a2a' : '#000';
 
+  // --- 1. Boden (flach; in der Kippansicht auf eine größere Fläche, die dann projiziert wird)
+  const [gw, gh] = tilted ? Tilt.groundSize(W, H) : [W, H];
+  const ox = (gw - W) / 2, oy = (gh - H) / 2;
+  const fc = { x: cam.x - ox, y: cam.y - oy };
+  const gc = tilted ? groundCtx(gw, gh) : g;
+  gc.fillStyle = bg;
+  gc.fillRect(0, 0, gw, gh);
+  drawSky(gc, m, fc, gw);
+  drawTiles(gc, m, fc.x, fc.y, game.time, gw, gh, tilted);
+  // Wand-Deko (Fackeln, Regale, Tafeln …) gehört zum Boden
+  for (const o of m.objects) if (!o.hidden && o.sortY === 0) o.draw(gc, fc.x, fc.y, game.time);
+  if (m.searchlight && game.state !== 'title') {
+    const sl = m.searchlight;
+    const cx = sl.x * TILE + 8 - fc.x, cy = sl.y * TILE - 8 - fc.y;
+    gc.fillStyle = sl.alarmT > 0 ? 'rgba(255,60,60,0.28)' : 'rgba(255,245,170,0.26)';
+    gc.beginPath(); gc.moveTo(cx, cy);
+    gc.arc(cx, cy, 88, sl.angle - 0.42, sl.angle + 0.42);
+    gc.closePath(); gc.fill();
+  }
+  if (tilted) {
+    g.fillStyle = bg;
+    g.fillRect(0, 0, W, H);
+    Tilt.warpGround(g, groundCanvas, W, H);
+  }
+
+  // --- 2. Aufrechte Dinge: jedes hat einen Fußpunkt (fx, fy) im normalen Bildschirmraum.
+  // In der Kippansicht wird um diesen Punkt skaliert und er auf die gekippte Ebene gesetzt.
   const list = [];
-  for (const o of m.objects) if (!o.hidden) list.push({ y: o.sortY, draw: () => o.draw(g, cam.x, cam.y, game.time) });
-  for (const n of m.npcs) list.push({ y: n.y + 16, draw: () => drawCharacter(n, cam) });
+  const add = (sortY, fx, fy, draw) => list.push({ y: sortY, fx, fy, draw });
+
+  if (tilted) {
+    // hohe Kacheln (Bäume, Büsche, Felsen, Zäune, Tore) stehen auf
+    const tx0 = Math.floor(fc.x / TILE), ty0 = Math.floor(fc.y / TILE);
+    for (let ty = Math.max(0, ty0); ty <= Math.min(m.h - 1, ty0 + Math.ceil(gh / TILE)); ty++) {
+      for (let tx = Math.max(0, tx0); tx <= Math.min(m.w - 1, tx0 + Math.ceil(gw / TILE)); tx++) {
+        if (!TALL.has(m.tiles[ty][tx])) continue;
+        const X = tx * TILE - cam.x, Y = ty * TILE - cam.y;
+        add((ty + 1) * TILE - 0.5, X + 8, Y + 16, () => g.drawImage(tileCutout(m, tx, ty, game.time), X, Y));
+      }
+    }
+  }
+  for (const o of m.objects) {
+    if (o.hidden || o.sortY === 0) continue;
+    const footY = o.sortY > (o.y + 3) * TILE ? (o.y + 1) * TILE : o.sortY;
+    add(o.sortY, (o.x + (o.w || 1) / 2) * TILE - cam.x, footY - cam.y, () => o.draw(g, cam.x, cam.y, game.time));
+  }
+  const bubbles = new Set();
+  if (game.state === 'play' && m.id === 'haunted') {
+    const h = game.haunt;
+    const want = { witch: !h.gate, bodo: h.gate && !h.front, zora: h.front && !h.count, plumps: h.chest && !h.lib, bit: h.lib && !h.candles, graf: h.candles && !h.king };
+    for (const [id, show] of Object.entries(want)) if (show) bubbles.add(id);
+  }
+  if (game.state === 'play' && m.id === 'village') {
+    if (game.step === 0) bubbles.add('felix');
+    if (game.step === 3 || game.step === 5) bubbles.add('mama');
+  }
+  for (const n of m.npcs) {
+    add(n.y + 16, n.x + 8 - cam.x, n.y + 16 - cam.y, () => { drawCharacter(n, cam); if (bubbles.has(n.id)) bubble(n, cam); });
+  }
   for (const it of m.items) {
     if (it.taken) continue;
-    list.push({ y: it.y + 12, draw: () => {
+    add(it.y + 12, it.x + 6 - cam.x, it.y + 12 - cam.y, () => {
       const bob = it.type === 'crystal' || it.type === 'key' ? Math.round(Math.sin(game.time * 3 + it.x) * 1.5) : 0;
       g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(Math.round(it.x - cam.x) + 2, Math.round(it.y - cam.y) + 11, 8, 2);
       g.drawImage(itemSprite(it.type), Math.round(it.x - cam.x), Math.round(it.y - cam.y) + bob);
-    } });
+    });
   }
   if (m.id === 'village' && !game.cloak.taken) {
     const c = game.cloak;
-    list.push({ y: c.y + 10, draw: () => g.drawImage(itemSprite('cloak'), Math.round(c.x - cam.x), Math.round(c.y - cam.y + Math.sin(game.time * 3))) });
+    add(c.y + 10, c.x + 6 - cam.x, c.y + 10 - cam.y, () => g.drawImage(itemSprite('cloak'), Math.round(c.x - cam.x), Math.round(c.y - cam.y + Math.sin(game.time * 3))));
   }
   for (const e of m.enemies) {
     if (!e.alive) continue;
-    list.push({ y: e.y + 16, draw: () => {
-      if (e.hurtT > 0 && Math.floor(game.time * 30) % 2) return;
-      const sx = Math.round(e.x - cam.x), sy = Math.round(e.y - cam.y);
-      if (e.type === 'trollboss') {
-        g.drawImage(trollSprite(e.throwT > 0 || e.hurtT > 0 ? 1 : 0), sx - 4, sy - 10);
-        if (e.stunT > 0) {
-          for (let i = 0; i < 3; i++) {
-            const a = game.time * 4 + (i * Math.PI * 2) / 3;
-            g.fillStyle = '#f8d848'; g.fillRect(Math.round(sx + 8 + Math.cos(a) * 9), Math.round(sy - 12 + Math.sin(a) * 3), 2, 2);
-          }
-        }
-        // Lebensbalken
-        g.fillStyle = '#1a1020'; g.fillRect(sx - 3, sy - 16, 22, 4);
-        g.fillStyle = '#e83848'; g.fillRect(sx - 2, sy - 15, Math.round((20 * e.hp) / HP.trollboss), 2);
-        return;
-      }
-      if (e.type === 'guard' || e.type === 'bomber') {
-        const spr = e.type === 'guard' ? guardSprite(e.flip, Math.floor(e.anim * 4) % 2) : bomberSprite(e.flip, e.throwT > 0 ? 1 : 0);
-        shadow(sx, sy);
-        g.drawImage(spr, sx, sy + 16 - spr.height);
-        return;
-      }
-      if (e.type === 'bat') {
-        g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(sx + 5, sy + 15, 6, 1);
-        g.drawImage(batSprite(Math.floor(e.anim * 8) % 2), sx, sy + Math.round(Math.sin(e.anim * 4) * 2));
-        return;
-      }
-      const spr = e.type === 'slime' ? slimeSprite(Math.sin(e.anim * 7) > 0 ? 1 : 0) : koboldSprite(e.flip, e.throwT > 0 ? 1 : 0);
-      shadow(sx, sy);
-      g.drawImage(spr, sx, sy);
-    } });
+    add(e.y + 16, e.x + 8 - cam.x, e.y + 16 - cam.y, () => drawEnemy(e, cam));
   }
   if (game.state !== 'title') {
-    game.party.forEach((p, i) => list.push({ y: p.y + 16 - (i ? 0.1 : 0), draw: () => (i === 0 ? drawLeader(cam) : drawCharacter(p, cam)) }));
+    game.party.forEach((p, i) => add(p.y + 16 - (i ? 0.1 : 0), p.x + 8 - cam.x, p.y + 16 - cam.y, () => (i === 0 ? drawLeader(cam) : drawCharacter(p, cam))));
   }
-  list.sort((a, b) => a.y - b.y).forEach((e) => e.draw());
+  for (const p of game.projectiles) add(p.y + 4, p.x - cam.x, p.y + 4 - cam.y, () => drawProjectile(p, cam));
 
-  for (const p of game.projectiles) {
-    const px = Math.round(p.x - cam.x), py = Math.round(p.y - cam.y);
-    if (p.kind === 'bomb') {
-      const lift = p.fly > 0 ? Math.round(Math.sin(Math.min(1, p.fly) * Math.PI) * 6) : 0;
-      g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(px - 3, py + 3, 6, 2);
-      g.drawImage(bombSprite(p.fuse > 0 && Math.floor(game.time * (p.fuse < 0.6 ? 16 : 6)) % 2 ? 1 : 0), px - 5, py - 6 - lift);
-    } else if (p.kind === 'rock') g.drawImage(rockSprite(), px - 5, py - 5);
-    else if (p.kind === 'nut') g.drawImage(itemSprite('chestnut'), px - 2, py - 2);
-    else g.drawImage(fireSprite(Math.floor(game.time * 10) % 2, !!p.reflected), px - 4, py - 4);
-  }
-  for (const pt of game.particles) { g.fillStyle = pt.c; g.fillRect(Math.round(pt.x - cam.x), Math.round(pt.y - cam.y), 2, 2); }
-
-  if (m.searchlight && game.state !== 'title') {
-    const sl = m.searchlight;
-    const cx = sl.x * TILE + 8 - cam.x, cy = sl.y * TILE - 8 - cam.y;
-    g.fillStyle = sl.alarmT > 0 ? 'rgba(255,60,60,0.28)' : 'rgba(255,245,170,0.26)';
-    g.beginPath(); g.moveTo(cx, cy);
-    g.arc(cx, cy, 88, sl.angle - 0.42, sl.angle + 0.42);
-    g.closePath(); g.fill();
+  list.sort((a, b) => a.y - b.y);
+  for (const e of list) {
+    if (tilted) {
+      const [px, py, sc] = P(e.fx, e.fy);
+      if (px < -60 || px > W + 60 || py < -20 || py > H + 120) continue;
+      g.setTransform(sc, 0, 0, sc, px - sc * e.fx, py - sc * e.fy);
+      e.draw();
+      g.setTransform(1, 0, 0, 1, 0, 0);
+    } else e.draw();
   }
 
-  // Höhle: Dunkelheit mit Lichtkreis um die Gruppe
+  for (const pt of game.particles) {
+    const [x, y, sc] = P(pt.x - cam.x, pt.y - cam.y);
+    g.fillStyle = pt.c; g.fillRect(Math.round(x), Math.round(y), Math.max(1, Math.round(2 * sc)), Math.max(1, Math.round(2 * sc)));
+  }
+
+  // --- 3. Licht und Dunkelheit (im Bildschirmraum, an den projizierten Positionen)
   if (m.theme === 'cave' && game.state !== 'title') {
     const L = leader();
-    const lx = L.x - cam.x + 8, ly = L.y - cam.y + 8;
+    const [lx, ly] = P(L.x - cam.x + 8, L.y - cam.y + 8);
     const grad = g.createRadialGradient(lx, ly, 40, lx, ly, 170);
     grad.addColorStop(0, 'rgba(6,4,10,0)');
     grad.addColorStop(1, 'rgba(6,4,10,0.55)');
@@ -1666,7 +1715,7 @@ function renderWorld(cam) {
 
   if (m.theme === 'haunted' && game.state !== 'title') {
     const L = leader();
-    const lx = L.x - cam.x + 8, ly = L.y - cam.y + 8;
+    const [lx, ly] = P(L.x - cam.x + 8, L.y - cam.y + 8);
     const inside = m.tile(Math.floor((L.x + 8) / TILE), Math.floor((L.y + 12) / TILE)) === T.WOOD;
     g.fillStyle = inside ? 'rgba(20,12,56,0.28)' : 'rgba(20,12,56,0.42)';
     g.fillRect(0, 0, W, H);
@@ -1679,31 +1728,60 @@ function renderWorld(cam) {
     g.globalCompositeOperation = 'lighter';
     for (const o of m.objects) {
       if (!o.glow) continue;
-      const ox = o.x * TILE - cam.x + 8, oy = o.y * TILE - cam.y + 6;
-      if (ox < -30 || oy < -30 || ox > W + 30 || oy > H + 30) continue;
-      const fl = 18 + Math.sin(game.time * 7 + o.x) * 2;
-      const gl = g.createRadialGradient(ox, oy, 2, ox, oy, fl);
+      const [gx, gy, sc] = P(o.x * TILE - cam.x + 8, o.y * TILE - cam.y + 6);
+      if (gx < -30 || gy < -30 || gx > W + 30 || gy > H + 30) continue;
+      const fl = (18 + Math.sin(game.time * 7 + o.x) * 2) * sc;
+      const gl = g.createRadialGradient(gx, gy, 2, gx, gy, fl);
       gl.addColorStop(0, o.type === 'cauldron' ? 'rgba(90,200,70,0.45)' : 'rgba(255,150,40,0.45)');
       gl.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = gl;
-      g.fillRect(ox - fl, oy - fl, fl * 2, fl * 2);
+      g.fillRect(gx - fl, gy - fl, fl * 2, fl * 2);
     }
     g.globalCompositeOperation = 'source-over';
   }
+}
 
-  if (game.state === 'play' && m.id === 'haunted') {
-    const h = game.haunt;
-    const npc = (id) => m.npcs.find((n) => n.id === id);
-    const open = { witch: !h.gate, bodo: h.gate && !h.front, zora: h.front && !h.count, plumps: h.chest && !h.lib, bit: h.lib && !h.candles, graf: h.candles && !h.king };
-    for (const [id, show] of Object.entries(open)) if (show && npc(id)) bubble(npc(id), cam);
+function drawEnemy(e, cam) {
+  if (e.hurtT > 0 && Math.floor(game.time * 30) % 2) return;
+  const sx = Math.round(e.x - cam.x), sy = Math.round(e.y - cam.y);
+  if (e.type === 'trollboss') {
+    g.drawImage(trollSprite(e.throwT > 0 || e.hurtT > 0 ? 1 : 0), sx - 4, sy - 10);
+    if (e.stunT > 0) {
+      for (let i = 0; i < 3; i++) {
+        const a = game.time * 4 + (i * Math.PI * 2) / 3;
+        g.fillStyle = '#f8d848'; g.fillRect(Math.round(sx + 8 + Math.cos(a) * 9), Math.round(sy - 12 + Math.sin(a) * 3), 2, 2);
+      }
+    }
+    // Lebensbalken
+    g.fillStyle = '#1a1020'; g.fillRect(sx - 3, sy - 16, 22, 4);
+    g.fillStyle = '#e83848'; g.fillRect(sx - 2, sy - 15, Math.round((20 * e.hp) / HP.trollboss), 2);
+    return;
   }
+  if (e.type === 'guard' || e.type === 'bomber') {
+    const spr = e.type === 'guard' ? guardSprite(e.flip, Math.floor(e.anim * 4) % 2) : bomberSprite(e.flip, e.throwT > 0 ? 1 : 0);
+    shadow(sx, sy);
+    g.drawImage(spr, sx, sy + 16 - spr.height);
+    return;
+  }
+  if (e.type === 'bat') {
+    g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(sx + 5, sy + 15, 6, 1);
+    g.drawImage(batSprite(Math.floor(e.anim * 8) % 2), sx, sy + Math.round(Math.sin(e.anim * 4) * 2));
+    return;
+  }
+  const spr = e.type === 'slime' ? slimeSprite(Math.sin(e.anim * 7) > 0 ? 1 : 0) : koboldSprite(e.flip, e.throwT > 0 ? 1 : 0);
+  shadow(sx, sy);
+  g.drawImage(spr, sx, sy);
+}
 
-  if (game.state === 'play' && m.id === 'village') {
-    const s = game.step;
-    const npc = (id) => m.npcs.find((n) => n.id === id);
-    if (s === 0 && npc('felix')) bubble(npc('felix'), cam);
-    if ((s === 3 || s === 5) && npc('mama')) bubble(npc('mama'), cam);
-  }
+function drawProjectile(p, cam) {
+  const px = Math.round(p.x - cam.x), py = Math.round(p.y - cam.y);
+  if (p.kind === 'bomb') {
+    const lift = p.fly > 0 ? Math.round(Math.sin(Math.min(1, p.fly) * Math.PI) * 6) : 0;
+    g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(px - 3, py + 3, 6, 2);
+    g.drawImage(bombSprite(p.fuse > 0 && Math.floor(game.time * (p.fuse < 0.6 ? 16 : 6)) % 2 ? 1 : 0), px - 5, py - 6 - lift);
+  } else if (p.kind === 'rock') g.drawImage(rockSprite(), px - 5, py - 5);
+  else if (p.kind === 'nut') g.drawImage(itemSprite('chestnut'), px - 2, py - 2);
+  else g.drawImage(fireSprite(Math.floor(game.time * 10) % 2, !!p.reflected), px - 4, py - 4);
 }
 
 function abilityLabel(id) {
@@ -1822,12 +1900,13 @@ function render() {
   }
 
   const m = map();
-  if (m.labels) for (const lb of m.labels) text(lb.text, lb.x - cam.x, lb.y - cam.y, { size: 5, align: 'center', color: '#f8d848' });
+  if (m.labels) for (const lb of m.labels) { const [x, y] = P(lb.x - cam.x, lb.y - cam.y); text(lb.text, x, y, { size: 5, align: 'center', color: '#f8d848' }); }
   if (m.id === 'haunted' && !game.haunt.candles) {
     const r = m.riddles.candles;
-    text(String(game.haunt.target), r.x * TILE + 8 - cam.x, r.y * TILE - 10 - cam.y, { size: 7, align: 'center', color: '#f8d848' });
+    const [x, y] = P(r.x * TILE + 8 - cam.x, r.y * TILE - 10 - cam.y);
+    text(String(game.haunt.target), x, y, { size: 7, align: 'center', color: '#f8d848' });
   }
-  for (const f of game.floats) text(f.text, f.x - cam.x, f.y - cam.y, { size: 6, align: 'center', color: f.color });
+  for (const f of game.floats) { const [x, y] = P(f.x - cam.x, f.y - cam.y); text(f.text, x, y, { size: 6, align: 'center', color: f.color }); }
 
   const b = game.banners[0];
   if (b) {
@@ -1850,10 +1929,19 @@ function renderTitle() {
     text((sel ? '> ' : '  ') + it.label, 66, 78 + i * 12, { size: 7, color: sel ? '#f8d848' : '#b8c8e8' });
   });
   if (Math.floor(game.time * 2) % 2 === 0) {
-    text(isTouch() ? 'Steuerkreuz wählen, A starten' : 'Hoch/Runter wählen, Leertaste/A starten', W / 2, 136, { size: 5, align: 'center', color: '#a8f070' });
+    text(isTouch() ? 'A: Start  ·  ☰: Menü' : 'Leertaste: Start · Esc: Menü · T: 3D', W / 2, 127, { size: 5, align: 'center', color: '#a8f070' });
   }
-  text(isTouch() ? '☰ oben rechts: Menü' : 'Im Spiel: Esc oder P = Menü (Speichern/Laden)', W / 2, 148, { size: 5, align: 'center', color: '#8898c0' });
+  // Pflicht-Hinweis nach den Lizenzbedingungen von gen1recomp (siehe LICENSE.md)
+  vctx.fillStyle = 'rgba(8,10,24,0.75)';
+  vctx.fillRect(0, Math.round(135 * K), W * K, Math.round(25 * K));
+  CREDIT.forEach((l, i) => text(l, W / 2, 137 + i * 7, { size: 4, align: 'center', color: '#c8d0e8', shadow: false }));
 }
+
+const CREDIT = [
+  'Based on the Pokemon Gen 1 Recompilation Project',
+  'by BOIS CLUB GAMES, LLC',
+  '(https://github.com/bryanthaboi/gen1recomp)',
+];
 
 function renderEnd() {
   if (game.endT < 0.6) return;
@@ -1941,6 +2029,7 @@ function loop(now) {
 }
 
 async function boot() {
+  Tilt.loadSetting(2);
   newGame();
   initInput(unlockAudio);
   addEventListener('resize', resize);
@@ -1965,6 +2054,6 @@ async function boot() {
 }
 
 // Für Tests/Debugging von außen erreichbar
-window.__theos = { get game() { return game; }, dialog, applySave, goTo: (...a) => goTo(...a) };
+window.__theos = { get game() { return game; }, dialog, applySave, goTo: (...a) => goTo(...a), tilt: Tilt };
 
 boot();

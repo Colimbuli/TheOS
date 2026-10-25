@@ -170,16 +170,45 @@ function tileImage(t, v) {
   return c;
 }
 
-export function drawTiles(g, world, camX, camY, time, viewW = 240, viewH = 160) {
+// Kacheln, die in der Kippansicht aufrecht stehen (statt flach auf dem Boden zu liegen)
+export const TALL = new Set([T.TREE, T.BUSH, T.ROCK, T.BOULDER, T.CRACK, T.FENCE, T.DIGFENCE, T.GATE, T.RGATE, T.BARS]);
+
+// Bodenkachel unter einer hohen Kachel
+function baseTile(world, t) {
+  if (world.theme === 'cave') return T.CFLOOR;
+  if (world.theme === 'inside' || (world.theme === 'haunted' && t === T.BOULDER)) return T.WOOD;
+  return T.GRASS;
+}
+
+// groundOnly: hohe Kacheln werden durch ihren Boden ersetzt (für die Kippansicht)
+export function drawTiles(g, world, camX, camY, time, viewW = 240, viewH = 160, groundOnly = false) {
   const frame = Math.floor(time * 2.5) % 4;
   const tx0 = Math.floor(camX / TILE), ty0 = Math.floor(camY / TILE);
   for (let ty = ty0; ty <= ty0 + Math.ceil(viewH / TILE); ty++) {
     for (let tx = tx0; tx <= tx0 + Math.ceil(viewW / TILE); tx++) {
       if (tx < 0 || ty < 0 || tx >= world.w || ty >= world.h) continue;
-      const t = world.tiles[ty][tx];
+      let t = world.tiles[ty][tx];
+      if (groundOnly && TALL.has(t)) t = baseTile(world, t);
       g.drawImage(tileImage(t, variant(world, tx, ty, t, frame)), tx * TILE - camX, ty * TILE - camY);
     }
   }
+}
+
+// Freigestellte Kachel (ohne Bodenhintergrund) für aufrechte Darstellung
+const cutoutCache = new Map();
+let NOBG = false;
+export function tileCutout(world, tx, ty, time) {
+  const t = world.tiles[ty][tx];
+  const v = variant(world, tx, ty, t, Math.floor(time * 2.5) % 4);
+  const key = t * 100000 + v;
+  let c = cutoutCache.get(key);
+  if (c) return c;
+  c = document.createElement('canvas');
+  c.width = c.height = TILE;
+  NOBG = true;
+  try { PAINT[t](c.getContext('2d'), v); } finally { NOBG = false; }
+  cutoutCache.set(key, c);
+  return c;
 }
 
 const px = (g, c, x, y, w = 1, h = 1) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
@@ -263,6 +292,7 @@ function blob(g, cx, cy, rx, ry, colorFn) {
 }
 
 function paintGrass(g, v) {
+  if (NOBG) return;
   px(g, COL.grass, 0, 0, 16, 16);
   const r = rng(17 + v * 31);
   // feine Struktur
@@ -359,7 +389,7 @@ const PAINT = {
       px(g, 'rgba(0,0,0,0.22)', 2, 13, 12, 3);
       px(g, COL.trunkD, 6, 11, 4, 5); px(g, COL.trunk, 7, 11, 2, 4); px(g, '#8a5a32', 7, 12, 1, 2);
     }
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (forestBg(x, y)) px(g, COL.leafO, x, y);
+    if (!NOBG) for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (forestBg(x, y)) px(g, COL.leafO, x, y);
     const cy0 = S ? 8 : 7;
     for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
       const dx = (x + 0.5 - 8) / 7.8, dy = (y + 0.5 - cy0) / 7.4;
@@ -411,7 +441,7 @@ const PAINT = {
   },
 
   [T.GATE](g) {
-    px(g, COL.path, 0, 0, 16, 16);
+    if (!NOBG) px(g, COL.path, 0, 0, 16, 16);
     px(g, COL.out, 0, 1, 16, 14);
     for (let x = 1; x < 16; x += 4) { px(g, COL.wood, x, 2, 3, 12); px(g, COL.woodL, x, 2, 1, 12); }
     px(g, COL.woodD, 0, 4, 16, 2); px(g, COL.woodD, 0, 10, 16, 2);
@@ -462,6 +492,7 @@ const PAINT = {
 
   // --- Höhle ---
   [T.CFLOOR](g, v) {
+    if (NOBG) return;
     px(g, CAVE.floor, 0, 0, 16, 16);
     const r = rng(300 + v * 13);
     for (let i = 0; i < 6; i++) {
@@ -531,6 +562,7 @@ const PAINT = {
 
   // --- Innenräume ---
   [T.WOOD](g) {
+    if (NOBG) return;
     px(g, '#b8834a', 0, 0, 16, 16);
     for (let y = 0; y < 16; y += 4) {
       px(g, '#8a5a30', 0, y + 3, 16, 1);
