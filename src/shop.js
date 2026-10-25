@@ -6,6 +6,7 @@ export const CATALOG = [
   { id: 'strength', name: 'Felix\' Superstärke', price: 8, desc: 'Felix schiebt Felsen und reißt Büsche aus.' },
   { id: 'dig', name: 'Arnes Grabkraft', price: 8, desc: 'Arne buddelt Tunnel, Erdwände und Schätze aus.' },
   { id: 'invis', name: 'Friedrichs Tarnzauber', price: 10, desc: 'Friedrich wird für ein paar Sekunden unsichtbar.' },
+  { id: 'legs', name: 'Linos Spaghetti-Beine', price: 10, desc: 'Lino wird lang – 7 Sekunden lang gehen Angriffe unter ihm durch.' },
   { id: 'sling', name: 'Kastanien-Schleuder', price: 12, desc: 'Felix schießt Kastanien auf Gegner (B, wenn nichts im Weg ist).' },
   { id: 'shovel', name: 'Schaufelschlag', price: 12, desc: 'Arne haut Gegner mit der Schaufel weg (B).' },
   { id: 'shield2', name: 'Großer Schild', price: 15, needs: 'shield', desc: 'Theos Schild hält doppelt so lange.' },

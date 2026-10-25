@@ -86,7 +86,11 @@ export class QuizUI {
       this.fx.sfx.item();
     } else {
       this.streak = 0;
-      this.result = { ok: false };
+      // Jede zweite falsche Antwort kostet einen Diamanten (Zähler wird mitgespeichert)
+      g.quizWrong = (g.quizWrong || 0) + 1;
+      const loss = g.quizWrong % 2 === 0 && g.diamonds > 0 ? 1 : 0;
+      g.diamonds -= loss;
+      this.result = { ok: false, loss };
       this.fx.sfx.hurt();
     }
     this.mode = 'fb';
@@ -153,7 +157,8 @@ export class QuizUI {
     });
     if (this.mode === 'fb') {
       const r = this.result;
-      const msg = r.ok ? (r.gain > 1 ? `Super! 5er-Serie: +${r.gain} Diamanten` : 'Richtig! +1 Diamant') : 'Leider falsch – grün ist richtig.';
+      const msg = r.ok ? (r.gain > 1 ? `Super! 5er-Serie: +${r.gain} Diamanten` : 'Richtig! +1 Diamant')
+        : r.loss ? 'Falsch – grün ist richtig. −1 Diamant' : 'Leider falsch – grün ist richtig.';
       text(msg, W / 2, 142, { size: 6, align: 'center', color: r.ok ? '#a8f070' : '#ff9090' });
       text('A: nächste Frage   B: Fächer', W / 2, 151, { size: 5, align: 'center', color: '#8898c0' });
     } else {
@@ -235,6 +240,8 @@ export class RiddleUI {
   // opts: { speaker, need, gen: () => {q, options, correct}, onSolved }
   constructor(game, fx, opts) {
     Object.assign(this, opts);
+    // Mindestens 3 Antworten, und alle in einer Reihe richtig – sonst geht es von vorn los
+    this.need = Math.max(3, this.need || 3);
     this.game = game; this.fx = fx;
     this.got = 0; this.nav = navigator(); this.closed = false;
     this.ask();
@@ -250,8 +257,8 @@ export class RiddleUI {
   answer(i) {
     const ok = i === this.qn.correct;
     this.sel = i;
-    if (ok) { this.got++; this.game.diamonds++; this.fx.sfx.item(); }
-    else this.fx.sfx.hurt();
+    if (ok) { this.got++; this.fx.sfx.item(); }
+    else { this.got = 0; this.fx.sfx.hurt(); }
     this.result = { ok };
     this.mode = 'fb';
   }
@@ -278,7 +285,7 @@ export class RiddleUI {
     panel(g);
     diamondsHeader(g, text, this.game);
     text(this.speaker, 9, 7, { size: 6, color: '#f8d848' });
-    text(`${Math.min(this.got, this.need)}/${this.need} richtig`, 150, 7, { size: 5, align: 'right', color: '#a8f070' });
+    text(`${Math.min(this.got, this.need)}/${this.need} in Folge`, 150, 7, { size: 5, align: 'right', color: '#a8f070' });
     const q = this.qn;
     q.lines.forEach((l, i) => text(l, 10, 22 + i * 9, { size: 6 }));
     q.opt.forEach((lines, i) => {
@@ -298,7 +305,7 @@ export class RiddleUI {
       const ok = this.result.ok;
       const done = this.got >= this.need;
       // Bei falscher Antwort wird die Lösung NICHT verraten – sonst könnte man raten und merken
-      const msg = ok ? (done ? 'Geschafft! Rätsel gelöst!' : 'Richtig! +1 Diamant') : 'Leider falsch. Neue Frage!';
+      const msg = ok ? (done ? 'Geschafft! Rätsel gelöst!' : `Richtig! Noch ${this.need - this.got} in Folge.`) : 'Falsch! Die Serie beginnt von vorn.';
       text(msg, W / 2, 147, { size: 6, align: 'center', color: ok ? '#a8f070' : '#ff9090' });
       text('A: weiter', W / 2, 155, { size: 5, align: 'center', color: '#8898c0' });
     } else {
@@ -387,10 +394,12 @@ export class PauseUI {
     text(title, 9, 7, { size: 6, color: '#f8d848' });
     if (this.mode === 'code') {
       text('Schreib dir diesen Code auf:', W / 2, 30, { size: 6, align: 'center' });
-      g.fillStyle = '#1c2850'; g.fillRect(20, 46, 200, 24);
-      text(this.codeText, W / 2, 53, { size: 10, align: 'center', color: '#88f0ff' });
-      text('Mit dem Code geht es am Anfang', W / 2, 80, { size: 5, align: 'center', color: '#c8d0e8' });
-      text('des aktuellen Ortes weiter.', W / 2, 89, { size: 5, align: 'center', color: '#c8d0e8' });
+      g.fillStyle = '#1c2850'; g.fillRect(20, 40, 200, 36);
+      const parts = this.codeText.split('-');
+      text(parts.slice(0, 3).join('-'), W / 2, 44, { size: 10, align: 'center', color: '#88f0ff' });
+      text(parts.slice(3).join('-'), W / 2, 60, { size: 10, align: 'center', color: '#88f0ff' });
+      text('Mit dem Code geht es am Anfang', W / 2, 82, { size: 5, align: 'center', color: '#c8d0e8' });
+      text('des aktuellen Ortes weiter.', W / 2, 90, { size: 5, align: 'center', color: '#c8d0e8' });
     }
     this.items.forEach(([id, label, data], i) => {
       const y = this.rowY(i), sel = i === this.sel;
@@ -454,6 +463,7 @@ const STARTER_INFO = [
   { id: 'felix', name: 'Felix', info: 'Superstärke · der Größte' },
   { id: 'arne', name: 'Arne', info: 'Graben · Locken und Sakko' },
   { id: 'friedrich', name: 'Friedrich', info: 'Unsichtbar · der Kleinste' },
+  { id: 'lino', name: 'Lino', info: 'Spaghetti-Beine · Angriffe gehen unten durch' },
 ];
 
 export class StarterUI {
@@ -466,7 +476,7 @@ export class StarterUI {
     const n = STARTER_INFO.length + 1;
     const d = this.nav(input, dt);
     if (d) { this.sel = (this.sel + d + n) % n; this.fx.sfx.blip(); }
-    for (let i = 0; i < n; i++) if (hit(tap, 16, this.rowY(i), 208, i < 4 ? 24 : 14)) { this.sel = i; input.aPressed = true; }
+    for (let i = 0; i < n; i++) if (hit(tap, 16, this.rowY(i), 208, i < STARTER_INFO.length ? 20 : 12)) { this.sel = i; input.aPressed = true; }
     if (input.bPressed || input.menuPressed) { this.closed = true; return; }
     if (input.aPressed) {
       this.closed = true;
@@ -474,23 +484,23 @@ export class StarterUI {
     }
   }
 
-  rowY(i) { return 24 + i * 27; }
+  rowY(i) { return 21 + i * 22; }
 
   render(g, text) {
     panel(g);
     text('Mit wem startest du?', 9, 7, { size: 6, color: '#f8d848' });
     STARTER_INFO.forEach((c, i) => {
       const y = this.rowY(i), sel = i === this.sel;
-      g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(16, y, 208, 24);
-      if (sel) { g.fillStyle = '#f8d848'; g.fillRect(16, y, 2, 24); }
+      g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(16, y, 208, 20);
+      if (sel) { g.fillStyle = '#f8d848'; g.fillRect(16, y, 2, 20); }
       const spr = charSprite(c.id, 0, sel ? Math.floor(Date.now() / 200) % 3 : 0);
-      g.drawImage(spr, 24, y + 22 - spr.height);
-      text(c.name, 46, y + 4, { size: 7, color: sel ? '#ffffff' : '#c8d0e8' });
-      text(c.info, 46, y + 14, { size: 5, color: '#a8b8d8' });
+      g.drawImage(spr, 24, y + 19 - spr.height);
+      text(c.name, 46, y + 3, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
+      text(c.info, 46, y + 12, { size: 5, color: '#a8b8d8' });
     });
-    const y = this.rowY(4), sel = this.sel === 4;
-    g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(16, y, 208, 14);
-    text('Zurück', 26, y + 4, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
+    const k = STARTER_INFO.length, y = this.rowY(k), sel = this.sel === k;
+    g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(16, y, 208, 12);
+    text('Zurück', 26, y + 3, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
     text('Die anderen musst du erst überzeugen!', W / 2, 151, { size: 5, align: 'center', color: '#a8f070' });
   }
 }

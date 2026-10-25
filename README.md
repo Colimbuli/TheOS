@@ -13,8 +13,8 @@ Alle Grafiken und Sounds sind eigene Pixel-Art bzw. per Code erzeugt – keine f
 
 ## Die Idee
 
-Vier Freunde wollen den bösen Drachen am Buttenberg besiegen: Theo, seine besten Freunde Felix und Arne
-und sein kleiner Bruder Friedrich. **Mit wem man startet, sucht man sich aus** – die anderen drei müssen erst
+Fünf Freunde wollen den bösen Drachen am Buttenberg besiegen: Theo, seine besten Freunde Felix, Arne und Lino
+und sein kleiner Bruder Friedrich. **Mit wem man startet, sucht man sich aus** – die anderen vier müssen erst
 überzeugt werden. Die Gruppe läuft zusammen, wer vorne läuft, setzt seine Spezialkraft ein.
 
 **Alle Fähigkeiten müssen im Laden gekauft werden.** Bezahlt wird mit Diamanten – die gibt es in der Schule
@@ -26,6 +26,7 @@ für richtig gelöste Aufgaben in Deutsch, Englisch, Geographie und Mathe (Klass
 | Felix | Superstärke – Felsen schieben, Büsche ausreißen | Kastanien-Schleuder |
 | Arne | Graben – Tunnel, Erdwände, Schätze | Schaufelschlag |
 | Friedrich | Tarnzauber – unsichtbar an Wachen vorbei | – |
+| Lino (blond, rote Cap, schwarze Weste) | Spaghetti-Beine – 7 Sekunden lang gehen Angriffe unter ihm durch | später: Spaghetti-Arme (durch Spalten greifen) |
 | Jelly (Katze, ab Kapitel 5) | Sprinten und über Schluchten springen | – (braucht keinen Laden) |
 
 ## Kapitel
@@ -37,9 +38,14 @@ für richtig gelöste Aufgaben in Deutsch, Englisch, Geographie und Mathe (Klass
 | Felix | Kastanienprobe: 5 Kastanien überstehen – ausweichen oder mit Theos Schild abwehren |
 | Theo | Spielt Verstecken (in einem Busch im Dorf). Gefunden? Dann seine Drachenprüfung: 3 Schulfragen |
 | Arne | Felsbrocken vor seiner Tür – nur Felix' Superstärke schiebt ihn weg |
+| Lino | Steckt mit seinen Spaghetti-Beinen am Brunnen im Matsch fest – Arne gräbt ihn frei |
 | Friedrich | Mama erlaubt es nur mit Tarnumhang (in Oma Hildes Garten – Arne gräbt unter dem Zaun durch). Gilt auch, wenn Friedrich die Startfigur ist |
 
-Sind alle vier dabei: unsichtbar an Wache Konrad vorbei zum Torhebel.
+Sind alle fünf dabei: unsichtbar an Wache Konrad vorbei zum Torhebel.
+
+**Aufgaben-Regeln:** Wer bei einer Figur Rätsel lösen muss, braucht mindestens 3 richtige Antworten **in Folge** –
+eine falsche Antwort setzt die Serie auf 0 (so hilft Durchdrücken nicht). Rätsel geben keine Diamanten.
+In der Schule kostet jede zweite falsche Antwort einen Diamanten (der Zähler wird mitgespeichert).
 
 **2 – Die Höhle im Buttenberg:** Erdwand (Arne) → Schleimhalle → Felsblock (Felix) → Schlüssel bei den
 Feuer-Kobolden → Drachenstatue (Theo wirft ihr Feuer zurück) → Höhlentroll (Friedrich schleicht vorbei)
@@ -69,7 +75,7 @@ A–E verbinden sie über die Unterwelt.
 | Talmitte (Höhlen B, D) | Suchscheinwerfer dreht sich – wer ins Licht gerät, löst Alarm aus und Wächter kommen. Friedrich schleicht unsichtbar zur Schatztruhe: **das Schwert** |
 | Unterwelt D | Schwertwächter, Schlüsselraum mit Feuerspuckern; Fels (Felix) zu E, Erdmauer (Arne) zu C, zwei Kristallkammern |
 | Westen, Höhle E | Hebel öffnet das Ausgangsgitter |
-| Osten, Höhle C | Bombenwerfer – seine Bomben sprengen die rissigen Felsen (oder Theo wirft sie zurück); Felsentür mit Feuerspuck braucht den Schlüssel |
+| Osten, Höhle C | Bombenwerfer – seine Bomben sprengen die rissigen Felsen (oder Theo wirft sie zurück); Felsentür mit Feuerspuck braucht den Schlüssel. Wird er besiegt, bevor die Felsen weg sind, taucht ein neuer auf |
 | Norden | Troll Grummel: Felsbrocken mit dem Schild zurückwerfen → benommen → mit dem Schwert angreifen |
 
 Theo greift mit **B** an, wenn ein Gegner direkt vor ihm steht – sonst hebt er den Schild.
@@ -88,7 +94,7 @@ Theo greift mit **B** an, wenn ein Gegner direkt vor ihm steht – sonst hebt er
 
 Der Spielstand wird automatisch im Browser gespeichert („Weiterspielen“ im Titelbild).
 Im Spiel öffnet **Esc / P** (Gamepad: Start, Touch: ☰) das Menü: 3 Speicherplätze und ein **Speichercode**
-zum Abschreiben (auch als Link: `?code=XXXX-XXXX-XXXX-XXXX-XXXX`). Über **Kapitel wählen** im Titelbild
+zum Abschreiben (auch als Link: `?code=XXXX-XXXX-XXXX-XXXX-XXXX-XXXX`). Über **Kapitel wählen** im Titelbild
 startet man jedes Kapitel direkt – mit allen Fähigkeiten, die man bis dahin hätte. Ältere Speichercodes
 bleiben gültig (Startfigur ist dann Theo).
 

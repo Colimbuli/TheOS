@@ -27,6 +27,12 @@ const HEADS = {
     up: ['5.6o5.', '4.o6ho4.', '3.o8ho3.', '2.o10ho2.', '2.o10ho2.', '2.o10ho2.', '2.o10ho2.', '3.2o6h2o3.'],
     side: ['6.5o5.', '5.o5ho4.', '4.o7ho3.', '3.o9ho2.', '3.o4h5so2.', '3.o3h4seso2.', '3.o2h7so2.', '4.2o4s2o4.'],
   },
+  // Cap mit Schirm (m/M), darunter blonde Haare (Lino)
+  cap: {
+    down: ['5.6o5.', '4.o6mo4.', '3.o8mo3.', '.o12Mo.', '2.oh8sho2.', '2.o2se4se2so2.', '2.o10so2.', '3.2o6s2o3.'],
+    up: ['5.6o5.', '4.o6mo4.', '3.o8mo3.', '2.o10mo2.', '2.o10ho2.', '2.o10ho2.', '2.o10ho2.', '3.2o6h2o3.'],
+    side: ['6.5o5.', '5.o5mo4.', '4.o7mo3.', '3.o9m2Mo', '3.o4h5so2.', '3.o3h4seso2.', '3.o2h7so2.', '4.2o4s2o4.'],
+  },
   // Locken: buschiger Umriss, zweifarbiges Haar (h/H)
   curly: {
     down: ['2.2o.2o2.2o.2o2.', '.oHhHhHhHhHhHho.', 'ohHhHhHhHhHhHhHo', 'oHhHhHhHhHhHhHho', 'oHho8soHho', '.2o2se4se2s2o.', '2.o10so2.', '3.2o6s2o3.'],
@@ -47,6 +53,13 @@ const BODIES = {
     back: ['2.o10jo2.', '.o12jo.', '.o12jo.', '.os10jso.', '2.o10Jo2.'],
     side: ['3.o8jo3.', '3.o5j3co3.', '3.o5j2cKo3.', '3.o3j2s3jo3.', '3.o8Jo3.'],
   },
+};
+
+// Weste: schwarz (j/J) über weitem weißem Shirt (c/C)
+BODIES.vest = {
+  front: ['2.o3j4c3jo2.', '.o4j4c4jo.', '.o4j4c4jo.', '.os3j4c3jso.', '2.o10Co2.'],
+  back: ['2.o10jo2.', '.o12jo.', '.o12jo.', '.os10jso.', '2.o10Co2.'],
+  side: ['3.o8jo3.', '3.o5j3co3.', '3.o5j3co3.', '3.o3j2s3jo3.', '3.o8Co3.'],
 };
 
 const LEGS = {
@@ -74,6 +87,7 @@ export const PALETTES = {
   guard:     { o: OUT, s: '#e8b890', e: EYE, h: '#a0a8b8', c: '#b03a3a', C: '#802a2a', k: '#3a3a3a', p: '#4a4a5a' },
   teacher:   { o: OUT, s: SKIN, e: EYE, h: '#8a8a94', c: '#4a9a5a', C: '#2e6a3c', k: '#e8e0c0', p: '#2e6a3c' },
   bruno:     { o: OUT, s: '#e8b890', e: EYE, h: '#3a2414', c: '#e8e0d0', C: '#b8a890', k: '#6a3a1a', p: '#4a3a2a' },
+  lino:      { o: OUT, s: SKIN, e: EYE, h: '#f0d050', m: '#d83a3a', M: '#9a2424', j: '#2a2a32', J: '#16161c', c: '#f4f4f4', C: '#d0d0d8', p: '#3a6ad0' },
 };
 
 // Körperbau je Figur: Friedrich klein, Felix groß, Arne mit Locken und Sakko
@@ -81,6 +95,7 @@ const STYLE = {
   felix: { tall: true },
   arne: { head: 'curly', body: 'jacket' },
   friedrich: { small: true },
+  lino: { head: 'cap', body: 'vest' },
 };
 
 const cache = new Map();

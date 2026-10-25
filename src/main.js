@@ -10,7 +10,7 @@ import { drawTiles, T, TILE, COL, drawDiamond, TALL, tileCutout } from './world.
 import Tilt from './tilt.js';
 import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES, createValley, createUnder, VALLEY_SPAWN, createMountain, createLair, MOUNTAIN_SPAWN, LAIR_SPAWN } from './maps.js';
 import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite, guardSprite, bomberSprite, bombSprite, rockSprite, mtrollSprite, rockmonSprite, rockBossSprite } from './sprites.js';
-import { createNPCs, talkTo, arneDoor, leverDialog, HEROES, questHint, ABILITY_NAME, STARTERS, HOME, THEO_BUSH, theoNPC, allFour } from './npcs.js';
+import { createNPCs, talkTo, arneDoor, leverDialog, HEROES, questHint, ABILITY_NAME, STARTERS, HOME, THEO_BUSH, theoNPC, allHeroes } from './npcs.js';
 import { Dialog } from './dialog.js';
 import { QuizUI, ShopUI, RiddleUI, PauseUI, ChapterUI, StarterUI } from './ui.js';
 import { nextQuestion } from './quiz.js';
@@ -53,7 +53,8 @@ function newGame(starter = 'theo') {
     state: 'title', time: 0, titleT: 0, endT: 0, menu: 0,
     maps, mapId: 'village',
     party: [member(starter, h.x, h.y, h.dir)],
-    starter, rec: { theo: false, felix: false, arne: false, friedrich: false, [starter]: true },
+    starter, rec: { theo: false, felix: false, arne: false, friedrich: false, lino: false, [starter]: true },
+    linoT: 0, linoCD: 0, quizWrong: 0, bomberT: 0,
     mama: 0, theoFound: false,
     mtn: { statue: false, wall: false, rocks: false, key: false, boss: false, jelly: false, done: false, taken: [] },
     jumpT: 0, jump: null, sprintT: 0, sprintCD: 0,
@@ -82,7 +83,8 @@ function newGame(starter = 'theo') {
 }
 
 // Gespeicherten Stand auf frisch aufgebaute Karten anwenden
-function applySave(d) {
+function applySave(d0) {
+  let d = d0;
   newGame(d.starter || 'theo');
   Object.assign(game, {
     step: d.step, owned: d.owned || {}, diamonds: d.diamonds, ammo: d.ammo, hasCloak: d.hasCloak,
@@ -94,6 +96,11 @@ function applySave(d) {
   const st = d.step || 0;
   game.rec = { ...game.rec, ...(d.rec || { felix: st >= 2, arne: st >= 3, friedrich: st >= 6 }) };
   for (const id of d.party) if (game.rec[id] !== undefined) game.rec[id] = true;
+  game.quizWrong = d.quizWrong || 0;
+  // Spielstände von vor Lino: nach Kapitel 1 ist er automatisch dabei
+  const party = [...d.party];
+  if (st >= 7 && !party.includes('lino')) { game.rec.lino = true; party.splice(party.includes('jelly') ? party.indexOf('jelly') : party.length, 0, 'lino'); }
+  d = { ...d, party };
   game.mama = d.mama ?? (st >= 6 ? 2 : st >= 4 ? 1 : 0);
   game.theoFound = !!d.theoFound;
   game.step = st >= 7 ? 7 : 0;
@@ -397,6 +404,7 @@ function update(dt) {
   updateTroll();
   updateSpitters(dt);
   updateSearchlight(dt);
+  updateBomberRespawn(dt);
   checkPickups();
   checkKonrad();
   checkAreas();
@@ -430,7 +438,7 @@ const PAUSE_API = {
   code: () => encodeCode(snapshot(game)),
   enterCode() {
     let input;
-    try { input = window.prompt('Speichercode eingeben (16 Zeichen):'); } catch { input = null; }
+    try { input = window.prompt('Speichercode eingeben (24 Zeichen):'); } catch { input = null; }
     if (input == null) return { ok: false, text: 'Eingabe hier nicht möglich? Spiel direkt öffnen.' };
     const d = decodeCode(input);
     if (!d) { sfx.bump(); return { ok: false, text: 'Der Code stimmt nicht. Bitte genau prüfen!' }; }
@@ -450,9 +458,10 @@ function fromCode(c) {
   const rec = { ...(c.rec || {}) };
   if (c.step >= 2) rec.felix = true;
   if (c.step >= 3) rec.arne = true;
-  if (c.step >= 6) { rec.friedrich = true; rec.theo = true; }
+  if (c.step >= 6) { rec.friedrich = true; rec.theo = true; rec.lino = true; }
   rec[starter] = true;
   const mama = c.step >= 6 || c.mama ? 2 : 0;
+  if (c.step >= 7) rec.lino = true;
   const party = [starter, ...STARTERS.filter((id) => id !== starter && rec[id])];
   if (c.mtn && c.mtn.jelly) party.push('jelly');
   const maxHearts = Math.min(12, 2 + c.level + (c.owned.heart || 0));
@@ -538,10 +547,11 @@ function startFromTitle(id) {
 }
 
 const OTHERS_TEXT = {
-  theo: 'Theo muss Felix und Arne überzeugen – und Mama, damit sein kleiner Bruder Friedrich mitdarf.',
-  felix: 'Felix muss Theo und Arne überzeugen – und Theos Mama, damit Friedrich mitdarf.',
-  arne: 'Arne muss Theo und Felix überzeugen – und Theos Mama, damit Friedrich mitdarf.',
-  friedrich: 'Friedrich muss Theo, Felix und Arne überzeugen – und Mama, damit er überhaupt mitdarf!',
+  theo: 'Theo muss Felix, Arne und Lino überzeugen – und Mama, damit sein kleiner Bruder Friedrich mitdarf.',
+  felix: 'Felix muss Theo, Arne und Lino überzeugen – und Theos Mama, damit Friedrich mitdarf.',
+  arne: 'Arne muss Theo, Felix und Lino überzeugen – und Theos Mama, damit Friedrich mitdarf.',
+  friedrich: 'Friedrich muss Theo, Felix, Arne und Lino überzeugen – und Mama, damit er überhaupt mitdarf!',
+  lino: 'Lino muss Theo, Felix und Arne überzeugen – und Theos Mama, damit Friedrich mitdarf.',
 };
 
 function beginNew(starter) {
@@ -567,6 +577,8 @@ function updateTimers(dt) {
   game.swingT = Math.max(0, game.swingT - dt);
   game.sprintT = Math.max(0, game.sprintT - dt);
   game.sprintCD = Math.max(0, game.sprintCD - dt);
+  game.linoCD = Math.max(0, game.linoCD - dt);
+  if (game.linoT > 0) { game.linoT -= dt; if (game.linoT <= 0) { game.linoT = 0; sfx.invisOff(); } }
   if (game.toast && (game.toast.t -= dt) <= 0) game.toast = null;
   if (game.invisT > 0) {
     game.invisT -= dt;
@@ -713,8 +725,8 @@ function pullLever() {
     save();
     return;
   }
-  if (!allFour(game) || game.mama < 2) {
-    dialog.open([`${HEROES[leader().id].name}: Psst! Noch nicht – erst müssen alle vier dabei sein.`, `Quest: ${questHint(game).replace(/^Quest: /, '')}`]);
+  if (!allHeroes(game) || game.mama < 2) {
+    dialog.open([`${HEROES[leader().id].name}: Psst! Noch nicht – erst müssen alle fünf dabei sein.`, `Quest: ${questHint(game).replace(/^Quest: /, '')}`]);
     return;
   }
   open({
@@ -773,7 +785,28 @@ function useAbility() {
       game.actT = 0.25; sfx.swing(); float('Hau-Ruck!', L.x + 8, L.y - 6, '#ffffff');
       return;
 
-    case 'arne':
+    case 'arne': {
+      const lino = m.id === 'village' && npcAt(frontPoint(L, 12));
+      if (lino && lino.id === 'lino' && lino.stuck) {
+        if (!o.dig) return needBuy('dig');
+        game.actT = 0.3;
+        sfx.dig();
+        burst(lino.x + 8, lino.y + 14, DIRT, 16);
+        open({
+          lines: ['*buddel buddel*', 'Lino: Frei! Meine Beine sind wieder da! Danke, Arne!', 'Lino: Und jetzt: ab zum Drachen. Ich bin dabei!'],
+          after() {
+            game.rec.lino = true;
+            fx.join('lino');
+            sfx.item();
+            fx.banner('LINO IST DABEI', 'B: Spaghetti-Beine (Laden)', '#a8f070');
+            fx.gainXP(15);
+          },
+        });
+        return;
+      }
+    }
+    // falls through
+    case 'arne-dig':
       if (t === T.DIG || t === T.DIGFENCE || t === T.EWALL) {
         if (!o.dig) return needBuy('dig');
         return arneDig(L, tx, ty, t);
@@ -802,6 +835,16 @@ function useAbility() {
       float('Sprint!', L.x + 8, L.y - 6, '#88f0ff');
       return;
     }
+
+    case 'lino':
+      if (!o.legs) return needBuy('legs');
+      if (game.linoT > 0) { game.linoT = 0; game.linoCD = 1.5; sfx.invisOff(); return; }
+      if (game.linoCD > 0) return;
+      game.linoT = 7;
+      game.linoCD = 10;
+      sfx.invisOn();
+      float('Spaghetti-Beine!', L.x + 8, L.y - 18, '#f8d848');
+      return;
 
     case 'friedrich':
       if (!o.invis) return needBuy('invis');
@@ -940,8 +983,10 @@ function arneSwing(L) {
 
 // --- Gegner, Geschosse, Statue, Troll ---------------------------------------------
 
+const linoTall = () => game.linoT > 0 && leader().id === 'lino';
+
 function hurt(n) {
-  if (game.hurtT > 0 || game.faintT > 0) return;
+  if (game.hurtT > 0 || game.faintT > 0 || linoTall()) return;
   const st = game.stats;
   st.hearts -= n;
   game.hurtT = 1;
@@ -1110,7 +1155,7 @@ function updateEnemies(dt) {
         }
       }
     }
-    if (visible && overlap(L.x + 3, L.y + 6, 10, 9, e.x + 3, e.y + 6, 10, 9)) {
+    if (visible && !linoTall() && overlap(L.x + 3, L.y + 6, 10, 9, e.x + 3, e.y + 6, 10, 9)) {
       hurt(1);
       move(L, nx * 10, ny * 10, false);
     }
@@ -1196,7 +1241,7 @@ function updateProjectiles(dt) {
       continue;
     }
     if (p.owner === 'enemy') {
-      if (Math.hypot(p.x - (L.x + 8), p.y - (L.y + 10)) < 8) {
+      if (Math.hypot(p.x - (L.x + 8), p.y - (L.y + 10)) < 8 && !linoTall()) {
         const shield = L.id === 'theo' && game.shieldT > 0;
         if (p.challenge) {
           p.t = 0;
@@ -1493,6 +1538,25 @@ function updateSpitters(dt) {
   });
 }
 
+// Ist der Bombenwerfer besiegt, bevor die rissigen Felsen gesprengt sind, kommt ein neuer –
+// sonst käme man nicht mehr weiter.
+function updateBomberRespawn(dt) {
+  const m = map();
+  if (m.id !== 'valley' || game.valley.door) return;
+  if (m.enemies.some((e) => e.alive && e.type === 'bomber')) { game.bomberT = 0; return; }
+  let cracks = false;
+  for (let x = 20; x <= 26; x++) if (m.tile(x, 12) === T.CRACK) cracks = true;
+  if (!cracks) return;
+  game.bomberT += dt;
+  if (game.bomberT < 5) return;
+  game.bomberT = 0;
+  const e = { id: 200 + game.dropN++, type: 'bomber', x: 23 * TILE, y: 14 * TILE, hp: HP.bomber, home: { x: 23 * TILE, y: 14 * TILE },
+    stunT: 0, cd: 2, hurtT: 0, alive: true, anim: 0, flip: false, throwT: 0, mode: 'idle', modeT: 0 };
+  m.enemies.push(e);
+  poof(e.x + 8, e.y + 8);
+  fx.toast('Ein neuer Bombenwerfer ist aufgetaucht! Lockt seine Bomben zu den rissigen Felsen.', 3.5);
+}
+
 function updateSearchlight(dt) {
   const m = map();
   const sl = m.searchlight;
@@ -1600,7 +1664,7 @@ function updateRockBoss(e, dt, L, nx, ny, d) {
       }
       return; // steckt fest: keine Berührungsschäden
   }
-  if (game.invisT <= 0 && d < 18 && e.mode !== 'stuck') {
+  if (game.invisT <= 0 && !linoTall() && d < 18 && e.mode !== 'stuck') {
     hurt(1);
     move(L, nx * 12, ny * 12, false);
   }
@@ -1860,7 +1924,17 @@ function drawCharacter(e, cam, alpha = 1) {
   shadow(sx, sy);
   if (e.spear && e.dir === 1) drawSpear(sx, sy);
   const spr = charSprite(e.pal, e.dir, walkFrame(e));
-  g.drawImage(spr, sx, sy + 16 - spr.height);
+  if (e.id === 'lino' && game.linoT > 0 && e === leader()) {
+    // Spaghetti-Beine: die Beine (unterste 3 Pixelreihen) werden lang gezogen
+    const grow = Math.min(1, (7 - game.linoT) * 6, game.linoT * 4);
+    const legH = Math.round(3 + 15 * grow), top = spr.height - 3;
+    g.drawImage(spr, 0, top, 16, 3, sx, sy + 16 - legH, 16, legH);
+    g.drawImage(spr, 0, 0, 16, top, sx, sy + 16 - legH - top, 16, top);
+  } else if (e.stuck) {
+    g.drawImage(spr, 0, 0, 16, spr.height - 4, sx, sy + 20 - spr.height, 16, spr.height - 4);
+    g.fillStyle = '#5a3a20'; g.fillRect(sx + 1, sy + 13, 14, 4);
+    g.fillStyle = '#7a5030'; g.fillRect(sx + 2, sy + 13, 12, 2);
+  } else g.drawImage(spr, sx, sy + 16 - spr.height);
   if (e.spear && e.dir !== 1) drawSpear(sx, sy);
   g.globalAlpha = 1;
 }
@@ -2004,6 +2078,7 @@ function renderWorld(cam) {
   if (game.state === 'play' && m.id === 'village' && game.step < 7) {
     if (!game.rec.felix) bubbles.add('felix');
     if (game.theoFound && !game.rec.theo) bubbles.add('theo');
+    if (!game.rec.lino) bubbles.add('lino');
     if (game.mama === 0 || (game.hasCloak && game.mama < 2)) bubbles.add('mama');
   }
   if (game.state === 'play' && m.id === 'lair' && !game.mtn.jelly) bubbles.add('jelly');
@@ -2164,10 +2239,11 @@ function abilityLabel(id) {
   const o = game.owned;
   const parts = {
     theo: [o.shield && 'Schild', o.sword && 'Schwert'],
-    felix: [o.strength && 'Stärke', o.sling && `Schleuder (${game.ammo})`],
+    felix: [o.strength && 'Stärke', o.sling && `Schleuder ${game.ammo}`],
     arne: [o.dig && 'Graben', o.shovel && 'Schaufel'],
     friedrich: [o.invis && 'Unsichtbar'],
     jelly: ['Sprinten & Springen'],
+    lino: [o.legs && 'Spaghetti-Beine'],
   }[id].filter(Boolean);
   return parts.length ? parts.join(' + ') : 'noch nichts (Laden)';
 }
@@ -2184,9 +2260,9 @@ function renderHUDLow() {
   g.fillStyle = '#a8f8b8'; g.fillRect(bx, by, fill, 1);
   game.party.forEach((m, i) => {
     const spr = charSprite(m.pal, 0, 0);
-    const x = Math.min(176, W - 4 - game.party.length * 15) + i * 15, y = 13;
+    const x = Math.min(176, W - 4 - game.party.length * 13) + i * 13, y = 13;
     g.fillStyle = i === 0 ? '#f8d848' : 'rgba(10,14,32,0.6)';
-    g.fillRect(x - 1, y - 1, 14, 11);
+    g.fillRect(x - 1, y - 1, 13, 11);
     g.drawImage(spr, 1, 0, 14, 9, x, y, 12, (9 * 12) / 14);
   });
 }
@@ -2267,7 +2343,8 @@ function render() {
   const st = game.stats, L = leader();
   text(String(game.diamonds), 14 + st.maxHearts * 8, 4, { size: 6, color: '#88f0ff' });
   text(`LV${st.level}`, 150, 4, { size: 7, color: '#f8d848' });
-  text(`${HEROES[L.id].name} – B: ${abilityLabel(L.id)}`, 4, 14, { size: 5, color: '#ffffff' });
+  text(`${HEROES[L.id].name}: ${abilityLabel(L.id)}`, 4, 14, { size: 5, color: '#ffffff' });
+  if (linoTall()) text(`Spaghetti-Beine: ${Math.ceil(game.linoT)}`, W / 2, 64, { size: 7, align: 'center', color: '#f8d848' });
   text(questHint(game), 4, 22, { size: 5, color: '#c8e0ff' });
   if (game.challenge.active) text(`Kastanien: ${game.challenge.blocked}/5`, W / 2, 64, { size: 7, align: 'center', color: '#f8d848' });
   if (game.invisT > 0) text(`Unsichtbar: ${Math.ceil(game.invisT)}`, W / 2, 64, { size: 7, align: 'center', color: '#d0c8ff' });
@@ -2301,7 +2378,7 @@ const NOOP_CTX = { fillStyle: '', fillRect() {}, drawImage() {} };
 function renderTitle() {
   text('BUTTENBERG', W / 2, 18, { size: 18, align: 'center', color: '#f8d848' });
   text('ADVENTURES', W / 2, 42, { size: 10, align: 'center', color: '#88e0ff' });
-  text('Vier Freunde gegen den Drachen', W / 2, 60, { size: 6, align: 'center', color: '#e8f0ff' });
+  text('Fünf Freunde gegen den Drachen', W / 2, 60, { size: 6, align: 'center', color: '#e8f0ff' });
   (game.titleCache || titleItems()).forEach((it, i) => {
     const sel = i === game.menu;
     text((sel ? '> ' : '  ') + it.label, 66, 78 + i * 12, { size: 7, color: sel ? '#f8d848' : '#b8c8e8' });
