@@ -86,6 +86,8 @@ projiziert (`Tilt.warpGround` in `src/tilt.js`).
 | Reden, Benutzen | Leertaste / Enter / E | A (unten) | A |
 | Fähigkeit | J / K / X | B / X | B |
 | Anführer wechseln | Q / Tab | Y / L / R | Pfeil-Knopf |
+| Menü (Speichern/Laden) | Esc / P | Start / Select | ☰ |
+| 3D-Ansicht umschalten | T | – | im Menü |
 
 In Schule und Laden: hoch/runter wählen, A bestätigen, B zurück – oder direkt antippen.
 
