@@ -5,7 +5,7 @@ import {
   drawHouse, drawFountain, drawStall, drawLever, drawSign, drawHouseSign, drawTorch, drawStatue,
   drawBlackboard, drawDesk, drawShelf, drawCounter, drawBarrel, drawPlant, drawWindow,
   drawPumpkin, drawGrave, drawCandle, drawWallBat, drawWallSpider, drawCauldron, drawDeadTree,
-  drawChest, drawSearchlight, drawSpitter, drawBrazier, drawCage,
+  drawChest, drawSearchlight, drawSpitter, drawBrazier, drawCage, drawWheel, drawArrowSlot, drawRuneGate,
 } from './world.js';
 
 function addObj(b, o, draw, sortY) {
@@ -664,5 +664,112 @@ export function createLair() {
     [5, 3, 22, 15, LAIR_SPAWN.x, LAIR_SPAWN.y, 1],
     [1, 4, 3, 6, 3 * TILE, 5 * TILE, 1],
   ];
+  return map;
+}
+
+// --- Kapitel 6: Das Tor zum Drachenhort (Zwergenhallen) -------------------------------
+//
+// Zentrale Halle mit Runentor. Sechs Flügel, beliebige Reihenfolge – jeder braucht die Fähigkeit eines Kindes:
+//   Westen oben:  Spiegelhalle (Theo wirft das Feuer in die Kristalldüse zurück)
+//   Westen unten: Gewichtskammer (Felix schiebt zwei Blöcke auf Druckplatten)
+//   Osten oben:   Wasserrad (Ferdinand gräbt drei Erdpfropfen aus dem Kanal)
+//   Osten unten:  Wachstube (Gitter nur offen, solange jemand auf der Platte steht → Friedrich schleicht
+//                 am Suchlicht vorbei zum Hebel)
+//   Südwesten:    Pfeilgang (Lino mit Spaghetti-Beinen)
+//   Südosten:     Schacht (Jelly springt über zwei Schluchten)
+// Danach: drei Kinder gleichzeitig auf die goldenen Platten, dann das Runenschloss (Lernaufgaben).
+
+export const DWARF_SPAWN = { x: 19 * TILE + 8, y: 29 * TILE, dir: 1 };
+
+export function createDwarf() {
+  const { map, b } = makeMap({ id: 'dwarf', w: 40, h: 32, fill: T.CWALL, edge: T.CWALL, theme: 'cave' });
+  const carve = (x, y, w, h) => b.rect(x, y, w, h, T.CFLOOR);
+  map.allowSplit = true;
+
+  carve(16, 12, 8, 10);                         // Halle
+  b.set(19, 11, T.BARS); b.set(20, 11, T.BARS); // Runentor
+  carve(19, 3, 2, 8);                           // Gang hinter dem Tor
+  b.set(19, 2, T.DOWN); b.set(20, 2, T.DOWN);   // Treppe zum Drachenhort
+  carve(19, 22, 2, 8);                          // Eingang
+  b.set(19, 30, T.UP); b.set(20, 30, T.UP);     // zurück zur Felsmonster-Höhle
+  for (const [x, y] of [[17, 13], [22, 13], [20, 19]]) b.set(x, y, T.GPLATE);
+  map.goldPlates = [[17, 13], [22, 13], [20, 19]];
+
+  // Theo: Spiegelhalle
+  carve(9, 14, 7, 1); carve(2, 11, 7, 7);
+  map.spitters = [{ x: 2, y: 12, dir: 3, cd: 1, speed: 70, gap: 2, target: 'theo' }];
+  b.solid(2, 12);
+
+  // Felix: Gewichtskammer
+  carve(9, 20, 7, 1); carve(2, 19, 7, 7);
+  map.felix = { boulders: [[5, 20], [3, 23]], plates: [[5, 22], [6, 23]] };
+  for (const [x, y] of map.felix.plates) b.set(x, y, T.PLATE);
+  for (const [x, y] of map.felix.boulders) { b.under(x, y, T.CFLOOR); b.set(x, y, T.BOULDER); }
+  map.felixReset = addObj(b, { type: 'lever', x: 8, y: 25, pulled: false }, drawLever); b.solid(8, 25);
+
+  // Ferdinand: Wasserrad
+  carve(24, 14, 7, 1); carve(31, 11, 7, 6);
+  b.rect(31, 10, 7, 1, T.WATER);
+  map.plugs = [[35, 11], [35, 13], [35, 15]];
+  for (const [x, y] of map.plugs) b.set(x, y, T.EWALL);
+  map.channel = [[35, 11], [35, 12], [35, 13], [35, 14], [35, 15]];
+  map.wheel = addObj(b, { type: 'wheel', x: 35, y: 16, on: false }, drawWheel, 17 * TILE);
+  b.solid(35, 16);
+
+  // Friedrich: Wachstube hinter dem Plattengitter
+  b.set(24, 20, T.BARS); b.set(22, 21, T.PLATE);
+  map.holdPlate = [22, 21]; map.holdGate = [24, 20];
+  carve(25, 20, 6, 1); carve(31, 18, 8, 8);
+  map.searchlight = addObj(b, { type: 'searchlight', x: 34, y: 21, angle: 0, alarmT: 0 }, drawSearchlight); b.solid(34, 21);
+
+  // Lino: Pfeilgang
+  carve(6, 28, 13, 1); carve(2, 27, 4, 3);
+  map.arrowStart = { x: 17 * TILE, y: 28 * TILE };
+  for (let x = 7; x <= 17; x++) map.spitters.push({ x, y: 27, dir: 0, cd: (x % 5) * 0.16, speed: 70, gap: 0.8, kind: 'arrow', group: 'lino' });
+
+  // Jelly: Schacht mit zwei Schluchten
+  carve(21, 28, 6, 1); carve(27, 27, 11, 4);
+  b.rect(29, 27, 1, 4, T.CHASM); b.rect(33, 27, 1, 4, T.CHASM);
+
+  map.spitterObjs = map.spitters.map((sp) => addObj(b, { type: sp.kind === 'arrow' ? 'arrowslot' : 'spitter', ...sp }, sp.kind === 'arrow' ? drawArrowSlot : drawSpitter, 0));
+
+  // Hebel: Friedrich, Lino, Jelly
+  map.levers = {
+    fried: addObj(b, { type: 'lever', x: 38, y: 24, pulled: false }, drawLever),
+    lino: addObj(b, { type: 'lever', x: 2, y: 28, pulled: false }, drawLever),
+    jelly: addObj(b, { type: 'lever', x: 37, y: 28, pulled: false }, drawLever),
+  };
+  for (const l of Object.values(map.levers)) b.solid(l.x, l.y);
+
+  map.runeGate = addObj(b, { type: 'runegate', x: 16, y: 11, runes: [] }, drawRuneGate, 0);
+  for (const [x, y] of [[2, 10], [37, 17], [31, 17], [27, 26], [4, 18]]) addObj(b, { type: 'torch', x, y }, drawTorch, 0);
+  for (const [x, y] of [[16, 21], [23, 12], [8, 17], [31, 25], [37, 30]]) b.set(x, y, T.MUSH);
+
+  const item = (type, x, y, id) => map.items.push({ id, type, x: x * TILE + 2, y: y * TILE + 2, taken: false });
+  item('crystal', 7, 11, 'd1'); item('apple', 2, 25, 'd2'); item('crystal', 32, 11, 'd3');
+  item('apple', 31, 18, 'd4'); item('crystal', 3, 29, 'd5'); item('crystal', 36, 30, 'd6'); item('apple', 18, 21, 'd7');
+
+  map.enemySpawns = [{ type: 'slime', x: 12, y: 14 }, { type: 'bat', x: 27, y: 14 }, { type: 'slime', x: 11, y: 20 }, { type: 'bat', x: 23, y: 28 }];
+
+  map.hints = [
+    [19, 22, 20, 29, 'Die Zwergenhallen! Hier geht es zum Drachenhort. Neu: Mit G (Select, ⋔) trennt sich die Gruppe.'],
+    [16, 12, 23, 21, 'Das Runentor hat sechs Runen. Jede leuchtet, wenn ein Rätsel in den Flügeln gelöst ist.'],
+    [2, 11, 8, 17, 'Eine Kristalldüse spuckt Feuer. Wirft Theos Schild es zurück, leuchtet sie vielleicht ...'],
+    [2, 19, 8, 25, 'Zwei Druckplatten und zwei Steinblöcke – ein Fall für Felix. Der Hebel setzt die Blöcke zurück.'],
+    [31, 11, 37, 16, 'Erdpfropfen verstopfen den Kanal zum Wasserrad. Ferdinand kann sie ausgraben.'],
+    [24, 19, 24, 21, 'Das Gitter ist nur offen, solange jemand auf der Platte steht. Trennt euch mit G!'],
+    [31, 18, 38, 25, 'Ein Suchlicht! Wer gesehen wird, löst Alarm aus. Friedrich?'],
+    [6, 28, 18, 28, 'Ein Pfeilgang! Wer getroffen wird, muss zurück an den Anfang. Linos Spaghetti-Beine?'],
+    [27, 27, 37, 30, 'Zwei Schluchten. Hier kommt nur rüber, wer springen kann!'],
+  ];
+  map.checkpoints = [
+    [16, 12, 23, 29, 19 * TILE + 8, 20 * TILE, 1],
+    [2, 11, 15, 17, 9 * TILE, 14 * TILE, 2],
+    [2, 19, 15, 25, 9 * TILE, 20 * TILE, 2],
+    [24, 11, 37, 16, 30 * TILE, 14 * TILE, 3],
+    [25, 18, 38, 25, 26 * TILE, 20 * TILE, 3],
+    [21, 27, 28, 30, 22 * TILE, 28 * TILE, 3],
+  ];
+  map.warps.push({ x: 19, y: 30, to: 'lair', tx: 2 * TILE, ty: 2 * TILE + 4, dir: 0 }, { x: 20, y: 30, to: 'lair', tx: 2 * TILE, ty: 2 * TILE + 4, dir: 0 });
   return map;
 }

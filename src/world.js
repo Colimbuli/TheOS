@@ -29,10 +29,13 @@ export const T = {
   CRACK: 30,    // rissiger Fels – Bomben sprengen ihn
   // Bergpfad
   CHASM: 31,    // Schlucht – nur Jelly kann darüber springen
+  // Zwergenhallen
+  PLATE: 32,    // Druckplatte (Stein)
+  GPLATE: 33,   // goldene Druckplatte am Runentor
 };
 const SOLID = new Set([T.WATER, T.TREE, T.FENCE, T.BUSH, T.ROCK, T.GATE, T.BOULDER, T.DIGFENCE,
   T.CWALL, T.EWALL, T.LOCKED, T.BARS, T.IWALL, T.RDOOR, T.RGATE, T.CLIFF, T.CRACK, T.CHASM]);
-const FLOORISH = new Set([T.GRASS, T.FLOWER, T.CFLOOR, T.MUSH, T.WOOD]); // hierauf darf ein Fels geschoben werden
+const FLOORISH = new Set([T.GRASS, T.FLOWER, T.CFLOOR, T.MUSH, T.WOOD, T.PLATE]); // hierauf darf ein Fels geschoben werden
 
 // Generischer Kartenbaukasten. Liefert das Kartenobjekt mit Bau-Helfern (b.*).
 export function makeMap({ id, w, h, fill, edge, theme }) {
@@ -658,6 +661,22 @@ const PAINT = {
     px(g, '#2a2236', 3, lip + 4, 1, 1); px(g, '#2a2236', 11, lip + 6, 1, 1);
   },
 
+  [T.PLATE](g) {
+    PAINT[T.CFLOOR](g, 0);
+    px(g, '#3a3440', 2, 3, 12, 11);
+    px(g, '#8a8496', 3, 4, 10, 9);
+    px(g, '#aaa4b6', 3, 4, 10, 2);
+    px(g, '#6a6478', 5, 7, 6, 4);
+  },
+
+  [T.GPLATE](g) {
+    PAINT[T.CFLOOR](g, 0);
+    px(g, '#4a3410', 1, 2, 14, 13);
+    px(g, '#d8a830', 2, 3, 12, 11);
+    px(g, '#f8e070', 2, 3, 12, 2);
+    px(g, '#a87818', 5, 6, 6, 5); px(g, '#f8e070', 7, 8, 2, 1);
+  },
+
   [T.CRACK](g, v) {
     if (v) paintGrass(g, 3); else PAINT[T.CFLOOR](g, 1);
     px(g, 'rgba(0,0,0,0.25)', 1, 13, 14, 3);
@@ -1160,4 +1179,45 @@ export function drawCage(g, o, cx, cy) {
   for (let i = 0; i < 8; i++) { px(g, '#1a1020', x + 2 + i * 4, y - 3, 2, 19); px(g, '#a8a0b8', x + 2 + i * 4, y - 3, 1, 19); }
   px(g, '#3a3040', x + 1, y + 15, 30, 2);
   px(g, '#f0c838', x + 14, y + 6, 4, 4); px(g, '#1a1020', x + 15, y + 7, 2, 2);
+}
+
+// Wasserrad (Zwergenhallen): dreht sich, wenn Wasser fließt
+export function drawWheel(g, o, cx, cy, t) {
+  const X = o.x * TILE - cx + 8, Y = o.y * TILE - cy + 4;
+  const a0 = o.on ? t * 3 : 0;
+  px(g, 'rgba(0,0,0,0.25)', X - 9, Y + 10, 18, 3);
+  for (let r = 0; r < 4; r++) {
+    const a = a0 + (r * Math.PI) / 4;
+    for (let i = -9; i <= 9; i++) px(g, '#6a4220', Math.round(X + Math.cos(a) * i), Math.round(Y + Math.sin(a) * i), 2, 2);
+  }
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    px(g, '#8a5a2c', Math.round(X + Math.cos(a) * 9), Math.round(Y + Math.sin(a) * 9), 2, 2);
+  }
+  px(g, '#c8a060', X - 2, Y - 2, 4, 4);
+}
+
+// Pfeilschlitz in der Wand
+export function drawArrowSlot(g, o, cx, cy) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  px(g, '#1a1008', X + 6, Y + 9, 4, 6);
+  px(g, o.off ? '#3a3a3a' : '#c8c8d8', X + 7, Y + 12, 2, 3);
+}
+
+// Runentor: sechs Runen (Theo, Felix, Ferdinand, Friedrich, Lino, Jelly), leuchten, wenn gelöst
+const RUNE_COL = ['#58c8ff', '#ff6a5a', '#c89048', '#c8a0ff', '#f8d848', '#80f0a0'];
+export function drawRuneGate(g, o, cx, cy, t) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  const slots = [0, 1, 2, 3, 4, 5].map((i) => X + 4 + (i < 3 ? i : i + 3) * 14);
+  slots.forEach((sx, i) => {
+    const lit = o.runes && o.runes[i];
+    px(g, '#1a1020', sx, Y + 2, 10, 12);
+    px(g, lit ? RUNE_COL[i] : '#3a3448', sx + 1, Y + 3, 8, 10);
+    const c = lit ? '#ffffff' : '#5a5468';
+    // einfache Runenzeichen
+    px(g, c, sx + 4, Y + 4, 2, 8);
+    if (i % 2) px(g, c, sx + 2, Y + 6, 6, 1); else px(g, c, sx + 2, Y + 9, 6, 1);
+    if (i > 2) px(g, c, sx + 6, Y + 4, 1, 3);
+    if (lit && Math.floor(t * 3 + i) % 3 === 0) px(g, '#ffffff', sx + 1, Y + 3, 1, 1);
+  });
 }

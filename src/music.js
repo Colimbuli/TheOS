@@ -70,6 +70,13 @@ export const SONGS = {
     melody: `E5 - - - B4 - E5 - | G5 - - - F#5 - E5 - | D5 - - - B4 - D5 - | F#5 - - - A5 - - - |
              B5 - - - G5 - E5 - | C6 - B5 - A5 - G5 - | F#5 - - - D5 - F#5 - | D#5 - - - F#5 - B5 -`,
   },
+  // Zwergenhallen: geheimnisvoll-mechanisch, g-Moll
+  dwarf: {
+    bpm: 96, lead: 'pulse25', bass: 'walk', arp: 'broken', drums: 'k . h . k . h . | k . h . s . h h', echo: true,
+    chords: 'Gm D Gm F Eb F D D',
+    melody: `G4 - Bb4 - D5 - G5 - | F#5 - - - D5 - A4 - | Bb4 - D5 - G5 - Bb5 - | A5 - - - F5 - C5 - |
+             G5 - - - Eb5 - Bb4 - | A5 - - - F5 - A5 - | F#5 - A5 - D6 - C6 - | A5 - - - F#5 - - -`,
+  },
   // Bosskampf: schnell und spannend, c-Moll
   boss: {
     bpm: 150, lead: 'pulse25', bass: 'pulse', arp: 'up', drums: 'k h s h k k s h | k h s h k k s s',
@@ -80,7 +87,7 @@ export const SONGS = {
 };
 
 // Welches Stück wo läuft
-export const MAP_SONG = { village: 'village', school: 'inside', shop: 'inside', cave: 'cave', under: 'cave', lair: 'cave', haunted: 'haunted', valley: 'valley', mountain: 'mountain' };
+export const MAP_SONG = { village: 'village', school: 'inside', shop: 'inside', cave: 'cave', under: 'cave', lair: 'cave', haunted: 'haunted', valley: 'valley', mountain: 'mountain', dwarf: 'dwarf' };
 
 // --- Stück in Noten-Ereignisse übersetzen (Raster: Sechzehntel) ---------------------------
 

@@ -92,6 +92,24 @@ Theo greift mit **B** an, wenn ein Gegner direkt vor ihm steht – sonst hebt er
 | Höhle der Felsmonster | Zwei Wächter am Käfig, viele Schläfer. Das Zahlenschloss öffnet sich nach 3 richtigen Lernaufgaben (Berge, Höhen, Deutsch) → **Jelly kommt mit** |
 | Verschlossene Tür, Schlucht | Schlüssel öffnet die Tür; über die Schlucht springt nur Jelly – die anderen klettern hinterher |
 
+Jelly springt (B) über Schluchten und auf bzw. über kleine Abhänge (eine Reihe Klippe oder einen Felsbrocken).
+
+**6 – Das Tor zum Drachenhort (Zwergenhallen):** Ein Runentor mit sechs Runen. Jeder Flügel braucht die
+Fähigkeit eines anderen Kindes – die Reihenfolge ist frei. **Neu: Die Gruppe kann sich trennen**
+(G / Select / Knopf ⋔). Getrennt bleibt jede Figur stehen, Q wechselt die gesteuerte Figur, G holt alle zusammen.
+
+| Flügel | Wer | Rätsel |
+|---|---|---|
+| Spiegelhalle | Theo | Das Feuer der Kristalldüse mit dem Schild zurückwerfen |
+| Gewichtskammer | Felix | Zwei Blöcke auf zwei Druckplatten schieben (Hebel setzt zurück) |
+| Wasserrad | Ferdinand | Drei Erdpfropfen ausgraben, damit das Wasser das Rad antreibt |
+| Wachstube | Friedrich | Das Gitter ist nur offen, solange jemand auf der Platte steht → trennen; unsichtbar am Suchlicht vorbei zum Hebel |
+| Pfeilgang | Lino | Wer getroffen wird, muss zurück – mit Spaghetti-Beinen fliegen die Pfeile unten durch |
+| Schacht | Jelly | Über zwei Schluchten zum Hebel springen |
+
+Danach müssen drei Kinder gleichzeitig auf den goldenen Platten stehen, und das Runenschloss will
+3 Schulaufgaben in Folge. Dann öffnet sich die Treppe zum Drachenhort.
+
 Der Spielstand wird automatisch im Browser gespeichert („Weiterspielen“ im Titelbild).
 Im Spiel öffnet **Esc / P** (Gamepad: Start, Touch: ☰) das Menü: 3 Speicherplätze und ein **Speichercode**
 zum Abschreiben (auch als Link: `?code=XXXX-XXXX-XXXX-XXXX-XXXX-XXXX`). Über **Kapitel wählen** im Titelbild
@@ -112,7 +130,7 @@ projiziert (`Tilt.warpGround` in `src/tilt.js`).
 ## Musik
 
 Eigene 8-Bit-Stücke, live im Browser erzeugt (`src/music.js`, keine Audiodateien): Titel, Dorf, Schule/Laden,
-Höhlen, Spukhaus, Tal der Trolle, Bergpfad und ein Boss-Thema für Troll und Riesen-Felsmonster. Beim Ortswechsel
+Höhlen, Spukhaus, Tal der Trolle, Bergpfad, Zwergenhallen und ein Boss-Thema für Troll und Riesen-Felsmonster. Beim Ortswechsel
 wird übergeblendet. Ein/aus mit **M** oder im Pause-Menü; der Browser merkt sich die Einstellung.
 Neue Stücke: in `SONGS` Tempo, Akkorde (1 pro Takt) und Melodie (8 Achtel pro Takt) eintragen –
 Bass, Begleitung und Schlagzeug entstehen automatisch.
@@ -125,9 +143,10 @@ Bass, Begleitung und Schlagzeug entstehen automatisch.
 | Reden, Benutzen | Leertaste / Enter / E | A (unten) | A |
 | Fähigkeit | J / K / X | B / X | B |
 | Anführer wechseln | Q / Tab | Y / L / R | Pfeil-Knopf |
-| Menü (Speichern/Laden) | Esc / P | Start / Select | ☰ |
+| Menü (Speichern/Laden) | Esc / P | Start | ☰ |
 | 3D-Ansicht umschalten | T | – | im Menü |
 | Musik an/aus | M | – | im Menü |
+| Gruppe trennen/sammeln (Kapitel 6) | G | Select | ⋔ |
 
 In Schule und Laden: hoch/runter wählen, A bestätigen, B zurück – oder direkt antippen.
 
@@ -184,7 +203,7 @@ python -m http.server 8000
 ```
 index.html        Seite, Touch-Steuerung, Styles
 src/main.js       Spielschleife, Gruppe, Fähigkeiten, Kampf, Kartenwechsel, HUD
-src/maps.js       Karten: Dorf, Schule, Laden, Höhle, Spukhaus, Tal der Trolle + Unterwelt, Bergpfad + Felsmonster-Höhle
+src/maps.js       Karten: Dorf, Schule, Laden, Höhle, Spukhaus, Tal der Trolle + Unterwelt, Bergpfad + Felsmonster-Höhle, Zwergenhallen
 src/world.js      Tile-System, Kollision, Tile- und Objektgrafik
 src/npcs.js       Figuren, Dialoge, Quest-Schritte und Hinweise
 src/quiz.js       Lernaufgaben der Schule (Fragenpools + Mathe-Generator)

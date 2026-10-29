@@ -10,18 +10,19 @@ const KEYMAP = {
   Escape: 'menu', KeyP: 'menu',
   KeyT: 'tilt',
   KeyM: 'music',
+  KeyG: 'split',
 };
 
 const kb = {};
 const tc = {};
 const latched = {}; // kurze Drücke merken, auch wenn sie zwischen zwei Frames wieder losgelassen werden
-let prevA = false, prevB = false, prevS = false, prevM = false;
+let prevA = false, prevB = false, prevS = false, prevM = false, prevG = false;
 let onGesture = () => {};
 
 export const input = {
   dir: { x: 0, y: 0 },
   a: false, b: false,
-  aPressed: false, bPressed: false, swapPressed: false, menuPressed: false, tiltPressed: false, musicPressed: false,
+  aPressed: false, bPressed: false, swapPressed: false, menuPressed: false, tiltPressed: false, musicPressed: false, splitPressed: false,
   tapY: 0, // kurzer Tipp hoch/runter (für Menüs), auch wenn zwischen zwei Frames losgelassen
   device: 'keyboard',
 };
@@ -79,7 +80,7 @@ function setupTouch() {
   dpad.addEventListener('pointerup', clear);
   dpad.addEventListener('pointercancel', clear);
 
-  for (const [id, k] of [['btnA', 'a'], ['btnB', 'b'], ['btnS', 'swap'], ['btnM', 'menu']]) {
+  for (const [id, k] of [['btnA', 'a'], ['btnB', 'b'], ['btnS', 'swap'], ['btnM', 'menu'], ['btnG', 'split']]) {
     const el = document.getElementById(id);
     const up = () => { tc[k] = false; el.classList.remove('on'); };
     el.addEventListener('pointerdown', (e) => {
@@ -104,7 +105,8 @@ function readGamepads() {
     if (ax < -0.5 || b(14)) gp.left = true;
     if (ax > 0.5 || b(15)) gp.right = true;
     if (b(0)) gp.a = true;             // unten (A/Kreuz)
-    if (b(9) || b(8)) gp.menu = true;  // Start / Select: Pause-Menü
+    if (b(9)) gp.menu = true;           // Start: Pause-Menü
+    if (b(8)) gp.split = true;          // Select: Gruppe trennen/sammeln
     if (b(1) || b(2)) gp.b = true;     // rechts oder links (B/X)
     if (b(3) || b(4) || b(5)) gp.swap = true; // Y, L, R: Anführer wechseln
   }
@@ -129,8 +131,11 @@ export function pollInput() {
   prevM = menu;
   input.tiltPressed = !!latched.tilt;
   input.musicPressed = !!latched.music;
+  const split = held('split');
+  input.splitPressed = (split && !prevG) || !!latched.split;
+  prevG = split;
   input.tapY = latched.up ? -1 : latched.down ? 1 : 0;
-  latched.a = latched.b = latched.swap = latched.up = latched.down = latched.menu = latched.tilt = latched.music = false;
+  latched.a = latched.b = latched.swap = latched.up = latched.down = latched.menu = latched.tilt = latched.music = latched.split = false;
   if (input.aPressed || input.bPressed) onGesture();
   prevA = input.a;
   prevB = input.b;

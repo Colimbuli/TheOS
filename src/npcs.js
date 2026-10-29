@@ -85,12 +85,22 @@ const LOTTE_TIPS = {
 };
 
 export function questHint(game) {
+  if (game.mapId === 'dwarf') return dwarfHint(game);
   if (game.mapId === 'mountain' || game.mapId === 'lair') return mountainHint(game);
   if (game.mapId === 'valley' || game.mapId === 'under') return valleyHint(game);
   if (game.mapId === 'haunted') return hauntHint(game);
   if (game.mapId === 'cave' || game.step >= 7 && game.mapId !== 'village') return caveHint(game);
   if (game.step >= 7) return 'Ziel: Die Höhle im Buttenberg (Norden)';
   return villageGoal(game);
+}
+
+function dwarfHint(game) {
+  const d = game.dw;
+  const n = ['theo', 'felix', 'ferd', 'fried', 'lino', 'jelly'].filter((k) => d[k]).length;
+  if (n < 6) return `Quest: Bringt die Runen zum Leuchten (${n}/6)`;
+  if (!d.plates) return 'Quest: Drei Kinder auf die goldenen Platten (G)';
+  if (!d.lock) return 'Quest: Das Runenschloss am Tor';
+  return 'Ziel: Die Treppe zum Drachenhort';
 }
 
 function mountainHint(game) {
