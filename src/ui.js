@@ -461,7 +461,7 @@ export class ChapterUI {
 const STARTER_INFO = [
   { id: 'theo', name: 'Theo', info: 'Schutzschild · hat den großen Plan' },
   { id: 'felix', name: 'Felix', info: 'Superstärke · der Größte' },
-  { id: 'arne', name: 'Arne', info: 'Graben · Locken und Sakko' },
+  { id: 'ferdinand', name: 'Ferdinand', info: 'Graben · Locken und Sakko' },
   { id: 'friedrich', name: 'Friedrich', info: 'Unsichtbar · der Kleinste' },
   { id: 'lino', name: 'Lino', info: 'Spaghetti-Beine · Angriffe gehen unten durch' },
 ];

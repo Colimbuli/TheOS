@@ -2,10 +2,10 @@
 //
 // Die Startfigur ist frei wählbar (game.starter). Die anderen drei müssen überzeugt werden:
 //   Felix     – Kastanienprobe (5 Kastanien überstehen: ausweichen oder Schild)
-//   Arne      – Felsbrocken vor seiner Tür wegschieben (Felix' Superstärke)
-//   Friedrich – Mama erlaubt es nur mit Tarnumhang (liegt in Oma Hildes Garten, Arne gräbt)
+//   Ferdinand      – Felsbrocken vor seiner Tür wegschieben (Felix' Superstärke)
+//   Friedrich – Mama erlaubt es nur mit Tarnumhang (liegt in Oma Hildes Garten, Ferdinand gräbt)
 //   Theo      – spielt Verstecken (Busch im Nordosten), dann seine Drachenprüfung (3 Schulfragen)
-//   Lino      – steckt mit seinen Spaghetti-Beinen im Matsch am Brunnen fest, Arne gräbt ihn frei
+//   Lino      – steckt mit seinen Spaghetti-Beinen im Matsch am Brunnen fest, Ferdinand gräbt ihn frei
 // Ist Friedrich die Startfigur, braucht er trotzdem Mamas Erlaubnis.
 // game.rec: wer dabei ist · game.mama: 0 nicht gefragt, 1 Umhang gesucht, 2 erlaubt
 // game.step: 0 Kapitel 1 läuft, 7 Tor offen
@@ -17,18 +17,18 @@ const T = 16;
 export const HEROES = {
   theo:      { name: 'Theo', ability: 'Schild' },
   felix:     { name: 'Felix', ability: 'Stärke' },
-  arne:      { name: 'Arne', ability: 'Graben' },
+  ferdinand:      { name: 'Ferdinand', ability: 'Graben' },
   friedrich: { name: 'Friedrich', ability: 'Unsichtbar' },
   lino:      { name: 'Lino', ability: 'Spaghetti-Beine' },
   jelly:     { name: 'Jelly', ability: 'Sprinten & Springen' },
 };
-export const STARTERS = ['theo', 'felix', 'arne', 'friedrich', 'lino'];
+export const STARTERS = ['theo', 'felix', 'ferdinand', 'friedrich', 'lino'];
 
 // Wo die Figuren im Dorf stehen (die Startfigur beginnt dort)
 export const HOME = {
   theo: { x: 10 * T, y: 8 * T, dir: 0 },
   felix: { x: 6 * T, y: 9 * T, dir: 0 },
-  arne: { x: 24 * T, y: 10 * T, dir: 0 },
+  ferdinand: { x: 24 * T, y: 10 * T, dir: 0 },
   friedrich: { x: 8 * T + 6, y: 9 * T + 4, dir: 0 },
   lino: { x: 17 * T, y: 12 * T, dir: 0 },
 };
@@ -50,7 +50,7 @@ export function theoNPC() {
   return { id: 'theo', pal: 'theo', x: (THEO_BUSH.x - 1) * T, y: THEO_BUSH.y * T, dir: 3, anim: 0, moving: false };
 }
 
-export const ABILITY_NAME = { shield: 'Theos Schutzschild', strength: 'Felix\' Superstärke', dig: 'Arnes Grabkraft', invis: 'Friedrichs Tarnzauber', legs: 'Linos Spaghetti-Beine' };
+export const ABILITY_NAME = { shield: 'Theos Schutzschild', strength: 'Felix\' Superstärke', dig: 'Ferdinands Grabkraft', invis: 'Friedrichs Tarnzauber', legs: 'Linos Spaghetti-Beine' };
 
 const lead = (game) => HEROES[game.party[0].id].name;
 const starterName = (game) => HEROES[game.starter || 'theo'].name;
@@ -63,8 +63,8 @@ export function villageGoal(game) {
   const buy = (id) => `Quest: Kauf ${ABILITY_NAME[id]}`;
   if (!r.felix) return game.challenge.active ? 'Quest: Überstehe 5 Kastanien' : 'Quest: Überzeuge Felix';
   if (!r.theo) return game.theoFound ? 'Quest: Theos Drachenprüfung' : 'Quest: Finde Theo – er spielt Verstecken';
-  if (!r.arne) return !has('felix') ? 'Quest: Überzeuge Felix' : o.strength ? 'Quest: Befreit Arne (Fels vor der Tür)' : buy('strength');
-  if (!r.lino) return o.dig ? 'Quest: Grabt Lino am Brunnen frei (Arne)' : buy('dig');
+  if (!r.ferdinand) return !has('felix') ? 'Quest: Überzeuge Felix' : o.strength ? 'Quest: Befreit Ferdinand (Fels vor der Tür)' : buy('strength');
+  if (!r.lino) return o.dig ? 'Quest: Grabt Lino am Brunnen frei (Ferdinand)' : buy('dig');
   if (game.mama < 2) {
     if (game.mama === 0 && !game.hasCloak) return game.starter === 'friedrich' ? 'Quest: Frag Mama, ob du mitdarfst' : 'Quest: Frag Mama wegen Friedrich';
     if (!game.hasCloak) return o.dig ? 'Quest: Hol den Tarnumhang (Garten)' : buy('dig');
@@ -77,7 +77,7 @@ export function villageGoal(game) {
 const LOTTE_TIPS = {
   felix: 'Lotte: Felix? Der übt gerade Kastanien-Weitwurf vor seinem Haus.',
   theo: 'Lotte: Theo? Der spielt Verstecken. Vorhin hat im Nordosten ein Busch ganz komisch geraschelt ...',
-  arne: 'Lotte: Arne sitzt fest – seit dem Sturm liegt ein Felsbrocken vor seiner Tür! Wer stark ist, schiebt ihn zur Seite.',
+  ferdinand: 'Lotte: Ferdinand sitzt fest – seit dem Sturm liegt ein Felsbrocken vor seiner Tür! Wer stark ist, schiebt ihn zur Seite.',
   lino: 'Lotte: Der arme Lino steckt am Brunnen im Matsch fest. Mit einer Schaufel wäre er schnell frei ...',
   mama: 'Lotte: Oma Hildes Garten? Die Erde unter dem Zaun ist ganz locker...',
   gate: 'Lotte: Konrad lässt niemanden durch. Aber wen er nicht sieht, den hält er auch nicht auf...',
@@ -97,7 +97,7 @@ function mountainHint(game) {
   const t = game.mtn, o = game.owned;
   const need = (id, text) => (o[id] ? text : `Quest: Kauf ${ABILITY_NAME[id]}`);
   if (!t.statue) return 'Quest: Besiegt die Feuerstatue (Theo)';
-  if (!t.wall) return need('dig', 'Quest: Grabt durch die Erdmauer (Arne)');
+  if (!t.wall) return need('dig', 'Quest: Grabt durch die Erdmauer (Ferdinand)');
   if (!t.key) return 'Quest: Holt den Schlüssel';
   if (!t.rocks) return need('strength', 'Quest: Schiebt den Felsbrocken (Felix)');
   if (!t.boss) return 'Quest: Besiegt das Riesen-Felsmonster';
@@ -132,7 +132,7 @@ function hauntHint(game) {
 function caveHint(game) {
   const c = game.cave, o = game.owned;
   const need = (id, text) => (o[id] ? text : `Quest: Kauf ${ABILITY_NAME[id]}`);
-  if (!c.dug) return need('dig', 'Quest: Grabt euch durch (Arne)');
+  if (!c.dug) return need('dig', 'Quest: Grabt euch durch (Ferdinand)');
   if (!c.boulder) return need('strength', 'Quest: Schiebt den Felsblock (Felix)');
   if (!c.key) return 'Quest: Findet den Schlüssel';
   if (!c.door) return 'Quest: Öffnet die Schlosstür';
@@ -223,7 +223,7 @@ export function talkTo(n, game, fx) {
         'Lotte: Und gleich daneben ist Brunos Laden. Da gibt es Schilde, Zaubertränke und noch viel mehr!',
       ] };
       const r = game.rec;
-      const key = game.step >= 7 ? 'done' : !r.felix ? 'felix' : !r.theo ? 'theo' : !r.arne ? 'arne' : !r.lino ? 'lino' : game.mama < 2 ? 'mama' : 'gate';
+      const key = game.step >= 7 ? 'done' : !r.felix ? 'felix' : !r.theo ? 'theo' : !r.ferdinand ? 'ferdinand' : !r.lino ? 'lino' : game.mama < 2 ? 'mama' : 'gate';
       return { lines: [LOTTE_TIPS[key]] };
     }
 
@@ -241,8 +241,8 @@ export function talkTo(n, game, fx) {
         `Lino: ${L}! Hilfe! Ich wollte über den Brunnen steigen – mit meinen Spaghetti-Beinen geht das eigentlich super.`,
         'Lino: Aber dann bin ich im Matsch ausgerutscht. Jetzt stecken meine Beine fest. Total verknotet!',
         `${L}: Zum Buttenberg kommst du so nicht mit ...`,
-        'Lino: Zum DRACHEN? Da will ich mit! Holt Arne – der kann mich ausbuddeln!',
-        'Tipp: Arne nach vorne holen und vor Lino B drücken.',
+        'Lino: Zum DRACHEN? Da will ich mit! Holt Ferdinand – der kann mich ausbuddeln!',
+        'Tipp: Ferdinand nach vorne holen und vor Lino B drücken.',
       ] };
 
     case 'bruno':
@@ -315,20 +315,20 @@ export function talkTo(n, game, fx) {
   return { lines: ['...'] };
 }
 
-export function arneDoor(game, fx) {
+export function ferdinandDoor(game, fx) {
   const L = lead(game);
   return {
     lines: [
       '*klopf klopf*',
-      'Arne: Endlich! Seit dem Sturm lag der Fels vor meiner Tür. Danke, Felix!',
+      'Ferdinand: Endlich! Seit dem Sturm lag der Fels vor meiner Tür. Danke, Felix!',
       `${L}: Kommst du mit zum Buttenberg? Wir besiegen den Drachen!`,
-      'Arne: Klar! Und wenn wir irgendwo nicht weiterkommen – ich buddel uns einfach ein Loch.',
+      'Ferdinand: Klar! Und wenn wir irgendwo nicht weiterkommen – ich buddel uns einfach ein Loch.',
     ],
     after() {
-      game.rec.arne = true;
-      fx.join('arne');
+      game.rec.ferdinand = true;
+      fx.join('ferdinand');
       fx.sfx.item();
-      fx.banner('ARNE IST DABEI', 'B: Löcher buddeln (Laden)', '#a8f070');
+      fx.banner('FERDINAND IST DABEI', 'B: Löcher buddeln (Laden)', '#a8f070');
       fx.gainXP(15);
     },
   };

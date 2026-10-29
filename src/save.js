@@ -48,7 +48,7 @@ const VALLEY = ['sword', 'key', 'lever', 'door', 'troll', 'done'];
 const CAVE = ['dug', 'boulder', 'key', 'door', 'statue', 'troll', 'lever', 'secret', 'done'];
 const HAUNT = ['gate', 'front', 'count', 'chest', 'lib', 'candles', 'king', 'door6', 'done'];
 const MAPS = ['village', 'cave', 'haunted', 'valley', 'under', 'mountain', 'lair'];
-const STARTERS = ['theo', 'felix', 'arne', 'friedrich', 'lino'];
+const STARTERS = ['theo', 'felix', 'ferdinand', 'friedrich', 'lino'];
 const MTN = ['statue', 'wall', 'rocks', 'key', 'boss', 'jelly', 'done'];
 
 // Feldliste: [Bitbreite, Wert lesen]. v = 1 (16 Zeichen), 2 (20 Zeichen) oder 3 (aktuell, 24 Zeichen, mit Lino)

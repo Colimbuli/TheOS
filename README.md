@@ -13,7 +13,7 @@ Alle Grafiken und Sounds sind eigene Pixel-Art bzw. per Code erzeugt – keine f
 
 ## Die Idee
 
-Fünf Freunde wollen den bösen Drachen am Buttenberg besiegen: Theo, seine besten Freunde Felix, Arne und Lino
+Fünf Freunde wollen den bösen Drachen am Buttenberg besiegen: Theo, seine besten Freunde Felix, Ferdinand und Lino
 und sein kleiner Bruder Friedrich. **Mit wem man startet, sucht man sich aus** – die anderen vier müssen erst
 überzeugt werden. Die Gruppe läuft zusammen, wer vorne läuft, setzt seine Spezialkraft ein.
 
@@ -24,7 +24,7 @@ für richtig gelöste Aufgaben in Deutsch, Englisch, Geographie und Mathe (Klass
 |---|---|---|
 | Theo | Schutzschild – wehrt Kastanien ab, wirft Feuer zurück | Großer Schild (hält länger) |
 | Felix | Superstärke – Felsen schieben, Büsche ausreißen | Kastanien-Schleuder |
-| Arne | Graben – Tunnel, Erdwände, Schätze | Schaufelschlag |
+| Ferdinand | Graben – Tunnel, Erdwände, Schätze | Schaufelschlag |
 | Friedrich | Tarnzauber – unsichtbar an Wachen vorbei | – |
 | Lino (blond, rote Cap, schwarze Weste) | Spaghetti-Beine – 7 Sekunden lang gehen Angriffe unter ihm durch | später: Spaghetti-Arme (durch Spalten greifen) |
 | Jelly (Katze, ab Kapitel 5) | Sprinten und über Schluchten springen | – (braucht keinen Laden) |
@@ -37,9 +37,9 @@ für richtig gelöste Aufgaben in Deutsch, Englisch, Geographie und Mathe (Klass
 |---|---|
 | Felix | Kastanienprobe: 5 Kastanien überstehen – ausweichen oder mit Theos Schild abwehren |
 | Theo | Spielt Verstecken (in einem Busch im Dorf). Gefunden? Dann seine Drachenprüfung: 3 Schulfragen |
-| Arne | Felsbrocken vor seiner Tür – nur Felix' Superstärke schiebt ihn weg |
-| Lino | Steckt mit seinen Spaghetti-Beinen am Brunnen im Matsch fest – Arne gräbt ihn frei |
-| Friedrich | Mama erlaubt es nur mit Tarnumhang (in Oma Hildes Garten – Arne gräbt unter dem Zaun durch). Gilt auch, wenn Friedrich die Startfigur ist |
+| Ferdinand | Felsbrocken vor seiner Tür – nur Felix' Superstärke schiebt ihn weg |
+| Lino | Steckt mit seinen Spaghetti-Beinen am Brunnen im Matsch fest – Ferdinand gräbt ihn frei |
+| Friedrich | Mama erlaubt es nur mit Tarnumhang (in Oma Hildes Garten – Ferdinand gräbt unter dem Zaun durch). Gilt auch, wenn Friedrich die Startfigur ist |
 
 Sind alle fünf dabei: unsichtbar an Wache Konrad vorbei zum Torhebel.
 
@@ -47,7 +47,7 @@ Sind alle fünf dabei: unsichtbar an Wache Konrad vorbei zum Torhebel.
 eine falsche Antwort setzt die Serie auf 0 (so hilft Durchdrücken nicht). Rätsel geben keine Diamanten.
 In der Schule kostet jede zweite falsche Antwort einen Diamanten (der Zähler wird mitgespeichert).
 
-**2 – Die Höhle im Buttenberg:** Erdwand (Arne) → Schleimhalle → Felsblock (Felix) → Schlüssel bei den
+**2 – Die Höhle im Buttenberg:** Erdwand (Ferdinand) → Schleimhalle → Felsblock (Felix) → Schlüssel bei den
 Feuer-Kobolden → Drachenstatue (Theo wirft ihr Feuer zurück) → Höhlentroll (Friedrich schleicht vorbei)
 → Hebel → Treppe in die Tiefe. Dazu ein Geheimraum mit Kristallen. Kein Game Over – wer erschöpft ist,
 startet am letzten Rastplatz.
@@ -73,7 +73,7 @@ A–E verbinden sie über die Unterwelt.
 | Süden, Höhle A | Eingang; Schwertwächter (Rüstung – nur das Schwert hilft) |
 | Unterwelt A → B | Schleime und Fledermäuse |
 | Talmitte (Höhlen B, D) | Suchscheinwerfer dreht sich – wer ins Licht gerät, löst Alarm aus und Wächter kommen. Friedrich schleicht unsichtbar zur Schatztruhe: **das Schwert** |
-| Unterwelt D | Schwertwächter, Schlüsselraum mit Feuerspuckern; Fels (Felix) zu E, Erdmauer (Arne) zu C, zwei Kristallkammern |
+| Unterwelt D | Schwertwächter, Schlüsselraum mit Feuerspuckern; Fels (Felix) zu E, Erdmauer (Ferdinand) zu C, zwei Kristallkammern |
 | Westen, Höhle E | Hebel öffnet das Ausgangsgitter |
 | Osten, Höhle C | Bombenwerfer – seine Bomben sprengen die rissigen Felsen (oder Theo wirft sie zurück); Felsentür mit Feuerspuck braucht den Schlüssel. Wird er besiegt, bevor die Felsen weg sind, taucht ein neuer auf |
 | Norden | Troll Grummel: Felsbrocken mit dem Schild zurückwerfen → benommen → mit dem Schwert angreifen |
@@ -86,9 +86,9 @@ Theo greift mit **B** an, wenn ein Gegner direkt vor ihm steht – sonst hebt er
 |---|---|
 | Eingang, Pfad | Fledermäuse, Bergtrolle |
 | Platz | Rechts eine Feuer spuckende Statue (Theo wirft das Feuer zurück), links ein Felsbrocken (Felix) |
-| Erdmauer → Kammer | Arne gräbt durch; Bergtrolle, Apfel und der **Schlüssel** |
+| Erdmauer → Kammer | Ferdinand gräbt durch; Bergtrolle, Apfel und der **Schlüssel** |
 | Gewundener Pfad, Bergkessel | Schlafende Felsmonster – wer zu nah kommt (oder sprintet), weckt sie. Friedrich schleicht unsichtbar vorbei. Kastanien prallen am Stein ab |
-| Riesen-Felsmonster (Boss) | Holt aus und stürmt los. Arne gräbt Löcher – stürmt es hinein, steckt es fest und das Schwert trifft. Danach schüttet es das Loch zu |
+| Riesen-Felsmonster (Boss) | Holt aus und stürmt los. Ferdinand gräbt Löcher – stürmt es hinein, steckt es fest und das Schwert trifft. Danach schüttet es das Loch zu |
 | Höhle der Felsmonster | Zwei Wächter am Käfig, viele Schläfer. Das Zahlenschloss öffnet sich nach 3 richtigen Lernaufgaben (Berge, Höhen, Deutsch) → **Jelly kommt mit** |
 | Verschlossene Tür, Schlucht | Schlüssel öffnet die Tür; über die Schlucht springt nur Jelly – die anderen klettern hinterher |
 

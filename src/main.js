@@ -10,7 +10,7 @@ import { drawTiles, T, TILE, COL, drawDiamond, TALL, tileCutout } from './world.
 import Tilt from './tilt.js';
 import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES, createValley, createUnder, VALLEY_SPAWN, createMountain, createLair, MOUNTAIN_SPAWN, LAIR_SPAWN } from './maps.js';
 import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite, guardSprite, bomberSprite, bombSprite, rockSprite, mtrollSprite, rockmonSprite, rockBossSprite } from './sprites.js';
-import { createNPCs, talkTo, arneDoor, leverDialog, HEROES, questHint, ABILITY_NAME, STARTERS, HOME, THEO_BUSH, theoNPC, allHeroes } from './npcs.js';
+import { createNPCs, talkTo, ferdinandDoor, leverDialog, HEROES, questHint, ABILITY_NAME, STARTERS, HOME, THEO_BUSH, theoNPC, allHeroes } from './npcs.js';
 import { Dialog } from './dialog.js';
 import { QuizUI, ShopUI, RiddleUI, PauseUI, ChapterUI, StarterUI } from './ui.js';
 import { nextQuestion } from './quiz.js';
@@ -47,13 +47,13 @@ function newGame(starter = 'theo') {
   const maps = { village: createVillage(), school: createSchool(), shop: createShop(), cave: createCave(), haunted: createHaunted(),
     valley: createValley(), under: createUnder(), mountain: createMountain(), lair: createLair() };
   maps.village.npcs = createNPCs(starter);
-  if (starter === 'arne') maps.village.setTile(24, 9, T.PATH); // Arne ist schon draußen
+  if (starter === 'ferdinand') maps.village.setTile(24, 9, T.PATH); // Ferdinand ist schon draußen
   const h = HOME[starter];
   game = {
     state: 'title', time: 0, titleT: 0, endT: 0, menu: 0,
     maps, mapId: 'village',
     party: [member(starter, h.x, h.y, h.dir)],
-    starter, rec: { theo: false, felix: false, arne: false, friedrich: false, lino: false, [starter]: true },
+    starter, rec: { theo: false, felix: false, ferdinand: false, friedrich: false, lino: false, [starter]: true },
     linoT: 0, linoCD: 0, quizWrong: 0, bomberT: 0,
     mama: 0, theoFound: false,
     mtn: { statue: false, wall: false, rocks: false, key: false, boss: false, jelly: false, done: false, taken: [] },
@@ -83,8 +83,15 @@ function newGame(starter = 'theo') {
 }
 
 // Gespeicherten Stand auf frisch aufgebaute Karten anwenden
+// Früher hieß Ferdinand intern "arne" – alte Spielstände umrechnen
+function migrateIds(d) {
+  const fix = (id) => (id === 'arne' ? 'ferdinand' : id);
+  const rec = d.rec ? Object.fromEntries(Object.entries(d.rec).map(([k, v]) => [fix(k), v])) : d.rec;
+  return { ...d, starter: d.starter && fix(d.starter), party: (d.party || []).map(fix), rec };
+}
+
 function applySave(d0) {
-  let d = d0;
+  let d = migrateIds(d0);
   newGame(d.starter || 'theo');
   Object.assign(game, {
     step: d.step, owned: d.owned || {}, diamonds: d.diamonds, ammo: d.ammo, hasCloak: d.hasCloak,
@@ -94,7 +101,7 @@ function applySave(d0) {
   Object.assign(game.cave, d.cave || {});
   // Kapitel-1-Fortschritt; alte Spielstände (nur "step") werden umgerechnet
   const st = d.step || 0;
-  game.rec = { ...game.rec, ...(d.rec || { felix: st >= 2, arne: st >= 3, friedrich: st >= 6 }) };
+  game.rec = { ...game.rec, ...(d.rec || { felix: st >= 2, ferdinand: st >= 3, friedrich: st >= 6 }) };
   for (const id of d.party) if (game.rec[id] !== undefined) game.rec[id] = true;
   game.quizWrong = d.quizWrong || 0;
   // Spielstände von vor Lino: nach Kapitel 1 ist er automatisch dabei
@@ -105,7 +112,7 @@ function applySave(d0) {
   game.theoFound = !!d.theoFound;
   game.step = st >= 7 ? 7 : 0;
   const v = game.maps.village, c = game.maps.cave;
-  if (game.rec.arne) v.setTile(24, 9, T.PATH);
+  if (game.rec.ferdinand) v.setTile(24, 9, T.PATH);
   if (game.hasCloak || game.mama === 2) { v.setTile(7, 16, T.TUNNEL); game.cloak.taken = true; }
   if (game.step >= 7) v.openGate();
   game.party = d.party.map((id) => member(id, d.x, d.y, d.dir));
@@ -457,7 +464,7 @@ function fromCode(c) {
   const starter = c.starter || 'theo';
   const rec = { ...(c.rec || {}) };
   if (c.step >= 2) rec.felix = true;
-  if (c.step >= 3) rec.arne = true;
+  if (c.step >= 3) rec.ferdinand = true;
   if (c.step >= 6) { rec.friedrich = true; rec.theo = true; rec.lino = true; }
   rec[starter] = true;
   const mama = c.step >= 6 || c.mama ? 2 : 0;
@@ -547,11 +554,11 @@ function startFromTitle(id) {
 }
 
 const OTHERS_TEXT = {
-  theo: 'Theo muss Felix, Arne und Lino überzeugen – und Mama, damit sein kleiner Bruder Friedrich mitdarf.',
-  felix: 'Felix muss Theo, Arne und Lino überzeugen – und Theos Mama, damit Friedrich mitdarf.',
-  arne: 'Arne muss Theo, Felix und Lino überzeugen – und Theos Mama, damit Friedrich mitdarf.',
-  friedrich: 'Friedrich muss Theo, Felix, Arne und Lino überzeugen – und Mama, damit er überhaupt mitdarf!',
-  lino: 'Lino muss Theo, Felix und Arne überzeugen – und Theos Mama, damit Friedrich mitdarf.',
+  theo: 'Theo muss Felix, Ferdinand und Lino überzeugen – und Mama, damit sein kleiner Bruder Friedrich mitdarf.',
+  felix: 'Felix muss Theo, Ferdinand und Lino überzeugen – und Theos Mama, damit Friedrich mitdarf.',
+  ferdinand: 'Ferdinand muss Theo, Felix und Lino überzeugen – und Theos Mama, damit Friedrich mitdarf.',
+  friedrich: 'Friedrich muss Theo, Felix, Ferdinand und Lino überzeugen – und Mama, damit er überhaupt mitdarf!',
+  lino: 'Lino muss Theo, Felix und Ferdinand überzeugen – und Theos Mama, damit Friedrich mitdarf.',
 };
 
 function beginNew(starter) {
@@ -653,7 +660,7 @@ function interact() {
       return;
     }
   }
-  if (m.id === 'village' && tx === 24 && ty === 7 && !game.rec.arne && m.tile(24, 9) !== T.BOULDER) { open(arneDoor(game, fx)); return; }
+  if (m.id === 'village' && tx === 24 && ty === 7 && !game.rec.ferdinand && m.tile(24, 9) !== T.BOULDER) { open(ferdinandDoor(game, fx)); return; }
   if (m.id === 'village' && m.tile(tx, ty) === T.BUSH && theoHiding()) {
     if (tx === THEO_BUSH.x && ty === THEO_BUSH.y) revealTheo();
     else { sfx.bump(); float('Raschel ...', tx * TILE + 8, ty * TILE - 4, '#ffffff'); fx.toast('Hier versteckt sich niemand.', 1.5); }
@@ -676,7 +683,7 @@ function interact() {
       fx.toast('Der Schlüssel aus der Bergkammer passt!', 3);
     } else dialog.open(['Eine verschlossene Felsentür. Den Schlüssel haben die Bergtrolle bestimmt irgendwo am Pfad versteckt.']);
   }
-  else if (t === T.DIG || t === T.EWALL) dialog.open(['Lockere Erde. Hier könnte Arne graben...']);
+  else if (t === T.DIG || t === T.EWALL) dialog.open(['Lockere Erde. Hier könnte Ferdinand graben...']);
   else if (t === T.LOCKED && m.id === 'valley') {
     if (game.valley.key) {
       editTile(m, tx, ty, T.PATH);
@@ -785,7 +792,7 @@ function useAbility() {
       game.actT = 0.25; sfx.swing(); float('Hau-Ruck!', L.x + 8, L.y - 6, '#ffffff');
       return;
 
-    case 'arne': {
+    case 'ferdinand': {
       const lino = m.id === 'village' && npcAt(frontPoint(L, 12));
       if (lino && lino.id === 'lino' && lino.stuck) {
         if (!o.dig) return needBuy('dig');
@@ -793,7 +800,7 @@ function useAbility() {
         sfx.dig();
         burst(lino.x + 8, lino.y + 14, DIRT, 16);
         open({
-          lines: ['*buddel buddel*', 'Lino: Frei! Meine Beine sind wieder da! Danke, Arne!', 'Lino: Und jetzt: ab zum Drachen. Ich bin dabei!'],
+          lines: ['*buddel buddel*', 'Lino: Frei! Meine Beine sind wieder da! Danke, Ferdinand!', 'Lino: Und jetzt: ab zum Drachen. Ich bin dabei!'],
           after() {
             game.rec.lino = true;
             fx.join('lino');
@@ -806,12 +813,12 @@ function useAbility() {
       }
     }
     // falls through
-    case 'arne-dig':
+    case 'ferdinand-dig':
       if (t === T.DIG || t === T.DIGFENCE || t === T.EWALL) {
         if (!o.dig) return needBuy('dig');
-        return arneDig(L, tx, ty, t);
+        return ferdinandDig(L, tx, ty, t);
       }
-      if (o.shovel) return arneSwing(L);
+      if (o.shovel) return ferdinandSwing(L);
       if (!o.dig) return needBuy('dig');
       game.actT = 0.3; sfx.bump(); float('Zu hart!', L.x + 8, L.y - 6, '#ffb0b0');
       return;
@@ -896,7 +903,7 @@ function felixStrength(L, tx, ty, t) {
 const TREASURES = ['Ein glänzender Kiesel!', 'Ein alter Knopf!', 'Eine Murmel!'];
 const DIRT = ['#a0703e', '#7a5030', '#c89060'];
 
-function arneDig(L, tx, ty, t) {
+function ferdinandDig(L, tx, ty, t) {
   game.actT = 0.3;
   const m = map();
   sfx.dig();
@@ -936,7 +943,7 @@ function arneDig(L, tx, ty, t) {
     burst(tx * TILE + 8, ty * TILE + 10, DIRT, 16);
     if (tx === 11 && ty === 19) {
       game.cave.secret = true;
-      fx.banner('GEHEIMGANG!', 'Arne hat einen versteckten Raum gefunden', '#88e0ff');
+      fx.banner('GEHEIMGANG!', 'Ferdinand findet einen Geheimraum', '#88e0ff');
       fx.gainXP(10);
     } else {
       if (!game.cave.dug) fx.gainXP(5);
@@ -966,7 +973,7 @@ function swordSwing(L) {
   }
 }
 
-function arneSwing(L) {
+function ferdinandSwing(L) {
   game.actT = 0.25;
   game.swingT = 0.25;
   game.swingKind = 'shovel';
@@ -1032,7 +1039,7 @@ function damageEnemy(e, dmg, kx = 0, ky = 0, src = 'nut') {
     if (e.mode !== 'stuck') {
       sfx.clang();
       float('HARR!', e.x + 8, e.y - 20, '#ffb0b0');
-      if (!game.seenHints.boss) { game.seenHints.boss = true; fx.toast('Zu hart! Lockt das Felsmonster in ein Loch, das Arne gräbt.', 3.5); }
+      if (!game.seenHints.boss) { game.seenHints.boss = true; fx.toast('Zu hart! Lockt das Felsmonster in ein Loch, das Ferdinand gräbt.', 3.5); }
       return;
     }
     dmg = src === 'sword' ? 2 : 1;
@@ -1660,7 +1667,7 @@ function updateRockBoss(e, dt, L, nx, ny, d) {
         m.setTile(e.hole.tx, e.hole.ty, T.DIG); // Loch ist zugeschüttet
         e.y -= 8;
         setMode('idle', 1.5);
-        fx.toast('Das Felsmonster hat sich befreit! Arne muss ein neues Loch graben.', 3);
+        fx.toast('Das Felsmonster hat sich befreit! Ferdinand muss ein neues Loch graben.', 3);
       }
       return; // steckt fest: keine Berührungsschäden
   }
@@ -2240,7 +2247,7 @@ function abilityLabel(id) {
   const parts = {
     theo: [o.shield && 'Schild', o.sword && 'Schwert'],
     felix: [o.strength && 'Stärke', o.sling && `Schleuder ${game.ammo}`],
-    arne: [o.dig && 'Graben', o.shovel && 'Schaufel'],
+    ferdinand: [o.dig && 'Graben', o.shovel && 'Schaufel'],
     friedrich: [o.invis && 'Unsichtbar'],
     jelly: ['Sprinten & Springen'],
     lino: [o.legs && 'Spaghetti-Beine'],

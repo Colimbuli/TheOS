@@ -6,13 +6,13 @@ export const TILE = 16;
 export const T = {
   GRASS: 0, FLOWER: 1, PATH: 2, WATER: 3, TREE: 4, FENCE: 5, BUSH: 6, ROCK: 7, GATE: 8,
   BOULDER: 9,   // Felix kann ihn schieben
-  DIG: 10,      // lockere Erde – Arne kann graben
-  DIGFENCE: 11, // Zaun mit lockerer Erde darunter – Arne gräbt einen Tunnel
+  DIG: 10,      // lockere Erde – Ferdinand kann graben
+  DIGFENCE: 11, // Zaun mit lockerer Erde darunter – Ferdinand gräbt einen Tunnel
   TUNNEL: 12,   // gegrabener Durchgang unter dem Zaun
   HOLE: 13,     // ausgegrabenes Loch (begehbar)
   // Höhle
   CFLOOR: 14, CWALL: 15,
-  EWALL: 16,    // Erdwand – Arne gräbt durch
+  EWALL: 16,    // Erdwand – Ferdinand gräbt durch
   LOCKED: 17,   // Schlosstür – braucht Schlüssel
   BARS: 18,     // Gittertor – öffnet per Hebel
   UP: 19,       // Treppe hinauf (zurück ins Dorf)

@@ -80,7 +80,7 @@ const SKIN = '#f8c8a0', OUT = '#1a1020', EYE = '#2a1a10';
 export const PALETTES = {
   theo:      { o: OUT, s: SKIN, e: EYE, h: '#6b3a1e', c: '#3a7bd5', C: '#2a5aa5', k: '#8b5a2b', p: '#4a3a2a' },
   felix:     { o: OUT, s: '#f0c098', e: EYE, h: '#c08a3a', c: '#d84848', C: '#a02e2e', k: '#3a3030', p: '#3a4a7a' },
-  arne:      { o: OUT, s: SKIN, e: EYE, h: '#5a3418', H: '#8a5428', j: '#3a4a6a', J: '#283450', c: '#f4f4f4', K: '#c83040', p: '#2e2e3a' },
+  ferdinand:      { o: OUT, s: SKIN, e: EYE, h: '#5a3418', H: '#8a5428', j: '#3a4a6a', J: '#283450', c: '#f4f4f4', K: '#c83040', p: '#2e2e3a' },
   friedrich: { o: OUT, s: '#fcd4b0', e: EYE, h: '#f4d860', c: '#f0a030', C: '#c07818', k: '#6a4a2a', p: '#3a6ab0' },
   mama:      { o: OUT, s: SKIN, e: EYE, h: '#4a2a1a', c: '#3aa8a0', C: '#2a7a74', k: '#e8d070', p: '#2a7a74' },
   merchant:  { o: OUT, s: SKIN, e: EYE, h: '#d86a2a', c: '#e0b030', C: '#b08020', k: '#7a4a20', p: '#5a4a3a' },
@@ -90,10 +90,10 @@ export const PALETTES = {
   lino:      { o: OUT, s: SKIN, e: EYE, h: '#f0d050', m: '#d83a3a', M: '#9a2424', j: '#2a2a32', J: '#16161c', c: '#f4f4f4', C: '#d0d0d8', p: '#3a6ad0' },
 };
 
-// Körperbau je Figur: Friedrich klein, Felix groß, Arne mit Locken und Sakko
+// Körperbau je Figur: Friedrich klein, Felix groß, Ferdinand mit Locken und Sakko
 const STYLE = {
   felix: { tall: true },
-  arne: { head: 'curly', body: 'jacket' },
+  ferdinand: { head: 'curly', body: 'jacket' },
   friedrich: { small: true },
   lino: { head: 'cap', body: 'vest' },
 };

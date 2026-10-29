@@ -33,13 +33,13 @@ export function createVillage() {
   b.rect(13, 10, 6, 6, T.PATH);   // Dorfplatz
   b.rect(5, 8, 1, 4, T.PATH);     // zu Felix
   b.rect(10, 8, 1, 4, T.PATH);    // zu Theo
-  b.rect(24, 8, 1, 4, T.PATH);    // zu Arne
+  b.rect(24, 8, 1, 4, T.PATH);    // zu Ferdinand
   b.rect(6, 14, 2, 2, T.PATH);    // zum Garten
   b.rect(18, 14, 1, 7, T.PATH);   // zur Schulgasse
   b.rect(13, 20, 11, 1, T.PATH);  // Schulgasse
   b.rect(15, 1, 2, 1, T.GATE);    // Tor zum Buttenberg
 
-  // Oma Hildes Garten – rundum Zaun, Arne gräbt unten durch
+  // Oma Hildes Garten – rundum Zaun, Ferdinand gräbt unten durch
   b.rect(3, 16, 8, 1, T.FENCE); b.rect(3, 21, 8, 1, T.FENCE);
   b.rect(3, 16, 1, 6, T.FENCE); b.rect(10, 16, 1, 6, T.FENCE);
   b.rect(4, 17, 6, 4, T.GRASS);
@@ -55,7 +55,7 @@ export function createVillage() {
   for (const [x, y] of [[2, 2], [29, 2], [2, 10], [29, 14], [29, 21], [11, 21]]) b.set(x, y, T.TREE);
   for (const [x, y] of [[28, 5], [28, 6], [19, 4], [20, 4], [8, 10], [27, 13], [2, 15], [25, 17], [11, 17]]) b.set(x, y, T.BUSH);
 
-  // Felsbrocken vor Arnes Tür
+  // Felsbrocken vor Ferdinands Tür
   b.set(23, 8, T.ROCK); b.set(25, 8, T.ROCK);
   b.under(24, 9, T.PATH);
   b.set(24, 9, T.BOULDER);
@@ -72,7 +72,7 @@ export function createVillage() {
   };
   house(3, 4, 5, 4, 2, ROOFS.red, ['Felix\' Haus. Felix ist draußen.']);
   house(9, 5, 4, 3, 1, ROOFS.blue, ['Theos Zuhause. Hier wohnt er mit Mama und Friedrich.']);
-  house(22, 4, 5, 4, 2, ROOFS.green, ['Arnes Haus.']);
+  house(22, 4, 5, 4, 2, ROOFS.green, ['Ferdinands Haus.']);
 
   // Schule und Laden – die Tür ist ein Durchgang
   const school = house(12, 16, 5, 4, 2, ROOFS.orange);
@@ -159,7 +159,7 @@ export function createShop() {
 
 // --- Höhle im Buttenberg ------------------------------------------------------------
 //
-// Weg: Eingang (unten) → Erdwand (Arne) → Schleimhalle → Felsblock (Felix) → Schlüsselraum mit Kobolden
+// Weg: Eingang (unten) → Erdwand (Ferdinand) → Schleimhalle → Felsblock (Felix) → Schlüsselraum mit Kobolden
 //      → Schlosstür → Drachenstatue (Theo wirft Feuer zurück) → Trollgang (Friedrich unsichtbar)
 //      → Hebel → Gittertor → Treppe hinab.   Geheimraum: Erdwand westlich vom Eingang.
 
@@ -172,7 +172,7 @@ export function createCave() {
   carve(12, 18, 8, 4);                          // Eingangshalle
   b.set(15, 22, T.UP); b.set(16, 22, T.UP);     // Treppe hinauf ins Dorf
   carve(15, 13, 2, 4);                          // Gang nach Norden
-  b.set(15, 17, T.EWALL); b.set(16, 17, T.EWALL); // Erdwand (Arne)
+  b.set(15, 17, T.EWALL); b.set(16, 17, T.EWALL); // Erdwand (Ferdinand)
   carve(9, 8, 14, 6);                           // Schleimhalle
   b.rect(10, 8, 2, 2, T.WATER);                 // Höhlensee
   b.set(23, 11, T.CFLOOR);                      // Durchgang nach Osten
@@ -225,15 +225,15 @@ export function createCave() {
 
   // Hinweise beim ersten Betreten (Tile-Rechtecke)
   map.hints = [
-    [12, 18, 19, 21, 'Die Höhle im Buttenberg! Eine Erdwand versperrt den Weg – ein Fall für Arne.'],
-    [9, 8, 22, 13, 'Schleime! Sie hüpfen auf euch zu. Felix\' Schleuder oder Arnes Schaufel helfen.'],
+    [12, 18, 19, 21, 'Die Höhle im Buttenberg! Eine Erdwand versperrt den Weg – ein Fall für Ferdinand.'],
+    [9, 8, 22, 13, 'Schleime! Sie hüpfen auf euch zu. Felix\' Schleuder oder Ferdinands Schaufel helfen.'],
     [20, 10, 22, 12, 'Ein Felsblock im Durchgang. Felix kann ihn wegschieben.'],
     [24, 8, 29, 14, 'Feuer-Kobolde! Theos Schild wirft ihre Feuerbälle zurück.'],
     [15, 3, 15, 6, 'Eine Drachenstatue spuckt Feuer! Halte Theos Schild hoch und wirf das Feuer zurück!'],
     [11, 1, 14, 2, 'Ein Höhlentroll! Wer sichtbar ist, kommt hier nicht vorbei...'],
     [1, 1, 3, 8, 'Ein Hebel! Drück A, um ihn umzulegen.'],
     [1, 10, 5, 13, 'Eine Treppe führt tiefer in den Berg hinein...'],
-    [5, 17, 10, 20, 'Ein Geheimraum! Arne hat ein gutes Gespür.'],
+    [5, 17, 10, 20, 'Ein Geheimraum! Ferdinand hat ein gutes Gespür.'],
   ];
 
   // Rastplätze: Wer erschöpft ist, startet hier neu
@@ -370,7 +370,7 @@ export function createHaunted() {
 //   Westen oben (Höhle E, Hebel fürs Ausgangsgitter) · Osten (Höhle C, Bombenwerfer, rissige Felsen,
 //   Felsentür mit Feuerspuck – braucht den Schlüssel) · Norden (Troll vor dem Ausgangsgitter)
 // Unterwelt: A → Schleime/Fledermäuse → B → Schwertwächter → Schlüsselraum · D → Fels (Felix) → E,
-//   Kristallkammer hinter Erdmauer · D → Erdmauer (Arne) → C mit Fels und Diamantenkammer
+//   Kristallkammer hinter Erdmauer · D → Erdmauer (Ferdinand) → C mit Fels und Diamantenkammer
 
 export const VALLEY_SPAWN = { x: 15 * TILE + 8, y: 26 * TILE, dir: 1 };
 
@@ -546,7 +546,7 @@ export function createUnder() {
 // --- Kapitel 5: Der Bergpfad (nach Theos Skizze "Level 5") --------------------------
 //
 // Eingang (unten, Fledermäuse) → Pfad mit Bergtrollen → Platz: links Felsbrocken (Felix), rechts
-// Feuer spuckende Statue (Theo) → Erdmauer (Arne) → Kammer mit Bergtrollen, Apfel und SCHLÜSSEL
+// Feuer spuckende Statue (Theo) → Erdmauer (Ferdinand) → Kammer mit Bergtrollen, Apfel und SCHLÜSSEL
 // Links: gewundener Pfad mit schlafenden Felsmonstern → Bergkessel (Felsmonster, Diamanten)
 // → Riesiges Felsmonster (Boss) → Höhleneingang → Höhle der Felsmonster: Jelly im Käfig,
 // verschlossene Tür (Schlüssel) → Schlucht (nur Jelly springt) → weiter zum Drachen.
@@ -566,7 +566,7 @@ export function createMountain() {
   G(3, 28, 16, 3);                                   // Platz
   b.under(4, 28, T.GRASS); b.set(4, 28, T.BOULDER);  // Felsbrocken vor dem Pfad (Felix)
   G(17, 19, 1, 9);                                   // Statuengang
-  b.set(18, 19, T.EWALL);                            // Erdmauer (Arne)
+  b.set(18, 19, T.EWALL);                            // Erdmauer (Ferdinand)
   G(19, 17, 8, 5);                                   // Schlüsselkammer
   G(12, 31, 4, 8);                                   // Pfad vom Eingang
   G(7, 39, 14, 1); G(6, 40, 16, 4); G(7, 44, 14, 1); // Eingang
@@ -611,10 +611,10 @@ export function createMountain() {
     [6, 39, 21, 44, 'Der Bergpfad! Ganz oben halten Felsmonster eine Katze gefangen.'],
     [3, 28, 18, 30, 'Links versperrt ein Felsbrocken den Pfad (Felix). Rechts spuckt eine Statue Feuer (Theo).'],
     [17, 22, 17, 27, 'Halte Theos Schild hoch und wirf das Feuer zur Statue zurück!'],
-    [17, 19, 17, 20, 'Eine Erdmauer! Ein Fall für Arne.'],
+    [17, 19, 17, 20, 'Eine Erdmauer! Ein Fall für Ferdinand.'],
     [19, 17, 26, 21, 'Bergtrolle! Und da hinten glänzt ein Schlüssel ...'],
     [4, 19, 10, 26, 'Psst! Schlafende Felsmonster. Wer zu nah kommt, weckt sie. Friedrich kann unsichtbar vorbei.'],
-    [6, 2, 23, 7, 'Das Riesen-Felsmonster! Lockt es in ein Loch, das Arne gräbt – steckt es fest, schnell das Schwert!'],
+    [6, 2, 23, 7, 'Das Riesen-Felsmonster! Lockt es in ein Loch, das Ferdinand gräbt – steckt es fest, schnell das Schwert!'],
   ];
   map.checkpoints = [
     [6, 39, 21, 44, MOUNTAIN_SPAWN.x, MOUNTAIN_SPAWN.y, 1],
