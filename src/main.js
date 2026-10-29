@@ -8,6 +8,7 @@ import { initInput, pollInput, input, isTouch } from './input.js';
 import { sfx, unlockAudio } from './audio.js';
 import { drawTiles, T, TILE, COL, drawDiamond, TALL, tileCutout } from './world.js';
 import Tilt from './tilt.js';
+import Music, { MAP_SONG } from './music.js';
 import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES, createValley, createUnder, VALLEY_SPAWN, createMountain, createLair, MOUNTAIN_SPAWN, LAIR_SPAWN } from './maps.js';
 import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite, guardSprite, bomberSprite, bombSprite, rockSprite, mtrollSprite, rockmonSprite, rockBossSprite } from './sprites.js';
 import { createNPCs, talkTo, ferdinandDoor, leverDialog, HEROES, questHint, ABILITY_NAME, STARTERS, HOME, THEO_BUSH, theoNPC, allHeroes } from './npcs.js';
@@ -334,6 +335,8 @@ function update(dt) {
   Tilt.update(dt);
   pollInput();
   if (input.tiltPressed) cycleTilt();
+  if (input.musicPressed) toggleMusic();
+  Music.update(currentSong());
   const tap = canvasTap;
   canvasTap = false;
   const tp = tapPos;
@@ -456,6 +459,8 @@ const PAUSE_API = {
   },
   toTitle() { save(); newGame(); dialog.active = false; },
   tiltLabel: () => Tilt.levelLabel(),
+  musicLabel: () => Music.label(),
+  toggleMusic: () => Music.toggle(),
   cycleTilt: () => { Tilt.cycle(); Tilt.saveSetting(); },
 };
 
@@ -490,6 +495,24 @@ function fromCode(c) {
     starter, rec, mama, hasCloak: c.hasCloak || mama === 2,
     quizIntro: true, seenHints: { felixTalk: true },
   };
+}
+
+function toggleMusic() {
+  Music.toggle();
+  sfx.blip();
+  if (game.state === 'play') fx.toast(`Musik: ${Music.label()}`, 1.5);
+}
+
+// Welches Musikstück gerade passt
+function currentSong() {
+  if (!game || game.state !== 'play') return 'title';
+  const m = map(), L = leader();
+  const boss = m.enemies && m.enemies.find((e) => e.alive && (e.type === 'trollboss' || e.type === 'rockboss'));
+  if (boss && m.arena) {
+    const a = m.arena;
+    if (L.x > a.x0 - 16 && L.x < a.x1 + 16 && L.y > a.y0 - 16 && L.y < a.y1 + 16) return 'boss';
+  }
+  return MAP_SONG[game.mapId] || 'village';
 }
 
 function cycleTilt() {
@@ -2391,7 +2414,7 @@ function renderTitle() {
     text((sel ? '> ' : '  ') + it.label, 66, 78 + i * 12, { size: 7, color: sel ? '#f8d848' : '#b8c8e8' });
   });
   if (Math.floor(game.time * 2) % 2 === 0) {
-    text(isTouch() ? 'A: Start  ·  ☰: Menü' : 'Leertaste: Start · Esc: Menü · T: 3D', W / 2, 127, { size: 5, align: 'center', color: '#a8f070' });
+    text(isTouch() ? 'A: Start  ·  ☰: Menü' : 'Leertaste: Start · Esc: Menü · T: 3D · M: Musik', W / 2, 127, { size: 5, align: 'center', color: '#a8f070' });
   }
   // Pflicht-Hinweis nach den Lizenzbedingungen von gen1recomp (siehe LICENSE.md)
   vctx.fillStyle = 'rgba(8,10,24,0.75)';
@@ -2538,6 +2561,6 @@ async function boot() {
 }
 
 // Für Tests/Debugging von außen erreichbar
-window.__theos = { get game() { return game; }, dialog, applySave, goTo: (...a) => goTo(...a), tilt: Tilt };
+window.__theos = { get game() { return game; }, dialog, applySave, goTo: (...a) => goTo(...a), tilt: Tilt, music: Music };
 
 boot();

@@ -340,7 +340,7 @@ export class PauseUI {
     if (mode === 'main') {
       this.items = this.fromTitle
         ? [['load', 'Spielstand laden'], ['enter', 'Speichercode eingeben'], ['back', 'Zurück']]
-        : [['resume', 'Weiterspielen'], ['save', 'Speichern'], ['load', 'Laden'], ['code', 'Speichercode anzeigen'], ['enter', 'Speichercode eingeben'], ['tilt', `3D-Ansicht: ${this.api.tiltLabel()}`], ['title', 'Zum Titelbild']];
+        : [['resume', 'Weiterspielen'], ['save', 'Speichern'], ['load', 'Laden'], ['code', 'Speichercode anzeigen'], ['enter', 'Speichercode eingeben'], ['tilt', `3D-Ansicht: ${this.api.tiltLabel()}`], ['music', `Musik: ${this.api.musicLabel()}`], ['title', 'Zum Titelbild']];
     } else if (mode === 'code') {
       this.codeText = this.api.code();
       this.items = [['back', 'Zurück']];
@@ -357,6 +357,7 @@ export class PauseUI {
     if (id === 'back') { if (this.mode === 'main') this.closed = true; else this.setMode('main'); return; }
     if (id === 'save' || id === 'load' || id === 'code') { this.setMode(id); return; }
     if (id === 'title') { this.closed = true; this.api.toTitle(); return; }
+    if (id === 'music') { this.api.toggleMusic(); this.fx.sfx.blip(); const keep = this.sel; this.setMode('main'); this.sel = keep; return; }
     if (id === 'tilt') { this.api.cycleTilt(); this.fx.sfx.blip(); const keep = this.sel; this.setMode('main'); this.sel = keep; return; }
     if (id === 'enter') { const r = this.api.enterCode(); if (r) this.msg = r; if (r && r.ok) this.closed = true; return; }
     if (id.startsWith('slot')) {
@@ -384,7 +385,7 @@ export class PauseUI {
   rowY(i) {
     if (this.mode === 'code') return 112;
     const slots = this.mode === 'save' || this.mode === 'load';
-    return 26 + i * (slots ? 21 : 16);
+    return 26 + i * (slots ? 21 : this.items.length > 7 ? 14 : 16);
   }
 
   render(g, text) {

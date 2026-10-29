@@ -109,6 +109,14 @@ Die Projektion ist eine Portierung von `src/render/Tilt.lua` aus dem gen1recomp-
 und `LICENSE.md`). Weil der Browser hier ohne Shader arbeitet, wird der Boden zeilenweise exakt
 projiziert (`Tilt.warpGround` in `src/tilt.js`).
 
+## Musik
+
+Eigene 8-Bit-Stücke, live im Browser erzeugt (`src/music.js`, keine Audiodateien): Titel, Dorf, Schule/Laden,
+Höhlen, Spukhaus, Tal der Trolle, Bergpfad und ein Boss-Thema für Troll und Riesen-Felsmonster. Beim Ortswechsel
+wird übergeblendet. Ein/aus mit **M** oder im Pause-Menü; der Browser merkt sich die Einstellung.
+Neue Stücke: in `SONGS` Tempo, Akkorde (1 pro Takt) und Melodie (8 Achtel pro Takt) eintragen –
+Bass, Begleitung und Schlagzeug entstehen automatisch.
+
 ## Steuerung
 
 | Aktion | Tastatur | Gamepad | Touch |
@@ -119,6 +127,7 @@ projiziert (`Tilt.warpGround` in `src/tilt.js`).
 | Anführer wechseln | Q / Tab | Y / L / R | Pfeil-Knopf |
 | Menü (Speichern/Laden) | Esc / P | Start / Select | ☰ |
 | 3D-Ansicht umschalten | T | – | im Menü |
+| Musik an/aus | M | – | im Menü |
 
 In Schule und Laden: hoch/runter wählen, A bestätigen, B zurück – oder direkt antippen.
 
@@ -188,6 +197,7 @@ src/sprites.js    Figuren-, Gegner- und Gegenstands-Sprites
 src/dialog.js     Dialogbox mit Schreibmaschinen-Effekt
 src/input.js      Tastatur, Touch, Gamepad
 src/audio.js      Chiptune-Soundeffekte (WebAudio)
+src/music.js      Hintergrundmusik (8-Bit, WebAudio)
 src/tilt.js       3D-Kippansicht (portiert aus gen1recomp, GPLv3)
 ```
 

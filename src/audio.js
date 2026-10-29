@@ -1,6 +1,7 @@
 // Kleine Chiptune-Soundeffekte per WebAudio – keine Audiodateien nötig.
 
 let ctx = null;
+export const audioCtx = () => ctx;
 
 export function unlockAudio() {
   if (!ctx) {
