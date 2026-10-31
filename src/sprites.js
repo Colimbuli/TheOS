@@ -496,3 +496,62 @@ export function rockBossSprite(mode, frame) {
     ell(10, 5, 3, 1.6, '#3e8a3a'); ell(22, 24, 2.4, 1.2, '#3e8a3a');
   });
 }
+
+// --- Kapitel 8: Der Drache vom Buttenberg (nach Theos Zeichnung: rot, gelbe Flügel, Hörner und Stacheln) ---
+export function dragonSprite(mode = 'idle', frame = 0) {
+  return canvasSprite(`dragon${mode}${frame}`, 64, 56, (px, ell) => {
+    const R = '#c8282a', RD = '#7a1418', RL = '#e8584a', Y = '#f0e040', YD = '#b8a020', O = '#1a0808';
+    const up = mode === 'fly' ? (frame ? -6 : -2) : frame && mode === 'idle' ? -1 : 0;
+    // Schwanz mit Stacheln (rechts hinten)
+    for (let i = 0; i < 14; i++) {
+      const x = 40 + i, y = 46 - Math.round(Math.sin(i / 4) * 5) - (i > 10 ? i - 10 : 0);
+      px(O, x, y - 1, 2, 4); px(R, x, y, 2, 2);
+      if (i % 3 === 0) { px(Y, x, y - 3, 1, 2); px(O, x, y - 4, 1, 1); }
+    }
+    // Flügel
+    const wing = (dir) => {
+      const cx = 32 + dir * 6;
+      for (let i = 0; i < 18; i++) {
+        const x = cx + dir * (4 + i), top = 18 + up - Math.round((18 - i) * 0.55) + (mode === 'fly' ? -4 : 0), bot = 34 - Math.round(i * 0.5);
+        if (bot <= top) continue;
+        px(O, x, top - 1, 1, bot - top + 2);
+        px(Y, x, top, 1, bot - top);
+        px(R, x, top, 1, 2);
+        if (i % 6 === 5) px(YD, x, top + 2, 1, bot - top - 2);
+      }
+    };
+    wing(-1); wing(1);
+    // Beine mit gelben Krallen
+    if (mode !== 'fly') for (const x of [20, 37]) { px(O, x, 40, 8, 10); px(R, x + 1, 41, 6, 8); px(Y, x, 49, 2, 2); px(Y, x + 3, 50, 2, 1); px(Y, x + 6, 49, 2, 2); }
+    // Körper
+    ell(32, 32 + up, 12, 13, (dx, dy, d) => (d > 0.86 ? O : dx < -0.4 ? RL : dy > 0.5 ? RD : R));
+    // Streifen auf dem Bauch
+    for (const y of [28, 33, 38]) px(RD, 27, y + up, 10, 1);
+    // Arme
+    for (const s of [-1, 1]) {
+      const x = s < 0 ? 15 : 43, y = 26 + up;
+      px(O, x, y, 6, 9); px(R, x + 1, y + 1, 4, 7);
+      px(Y, x - (s < 0 ? 1 : -4), y + 8, 2, 2); px(Y, x + 2, y + 9, 1, 2); px(Y, x + (s < 0 ? 4 : 1), y + 8, 2, 2);
+    }
+    // Rückenstacheln
+    for (const x of [24, 28, 36, 40]) { px(O, x, 20 + up, 3, 4); px(Y, x + 1, 21 + up, 1, 2); }
+    // Kopf
+    ell(32, 13 + up, 9, 8, (dx, dy, d) => (d > 0.84 ? O : dx < -0.4 && dy < 0 ? RL : R));
+    px(O, 23, 1 + up, 3, 6); px(Y, 24, 2 + up, 1, 4);   // Hörner
+    px(O, 38, 1 + up, 3, 6); px(Y, 39, 2 + up, 1, 4);
+    if (mode === 'stun') {
+      px(O, 27, 10 + up, 3, 1); px(O, 28, 9 + up, 1, 3); px(O, 34, 10 + up, 3, 1); px(O, 35, 9 + up, 1, 3);
+    } else {
+      px(Y, 27, 9 + up, 3, 2); px(O, 28, 10 + up, 1, 1);
+      px(Y, 34, 9 + up, 3, 2); px(O, 35, 10 + up, 1, 1);
+    }
+    if (mode === 'roar' || mode === 'fly') {
+      px(O, 27, 14 + up, 10, 6); px('#ff8a2a', 28, 16 + up, 8, 3); px('#ffd060', 30, 17 + up, 4, 1);
+      for (const x of [28, 30, 33, 35]) px('#ffffff', x, 14 + up, 1, 2);
+    } else {
+      px(O, 28, 16 + up, 8, 1);
+      for (const x of [29, 34]) px('#ffffff', x, 17 + up, 1, 1);
+    }
+    px(RD, 30, 13 + up, 1, 1); px(RD, 33, 13 + up, 1, 1); // Nasenlöcher
+  });
+}

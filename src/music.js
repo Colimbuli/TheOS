@@ -77,6 +77,20 @@ export const SONGS = {
     melody: `G4 - Bb4 - D5 - G5 - | F#5 - - - D5 - A4 - | Bb4 - D5 - G5 - Bb5 - | A5 - - - F5 - C5 - |
              G5 - - - Eb5 - Bb4 - | A5 - - - F5 - A5 - | F#5 - A5 - D6 - C6 - | A5 - - - F#5 - - -`,
   },
+  // Lavahöhle: heiß und treibend, e-Moll
+  lava: {
+    bpm: 116, lead: 'pulse25', bass: 'bounce', arp: 'up', drums: 'k . h k s . h . | k k h . s . h h',
+    chords: 'Em F Em D C D Em Em',
+    melody: `E5 - G5 - B5 - - G5 | A5 - - - F5 - C5 - | B4 - E5 - G5 - F#5 E5 | F#5 - - - D5 - A4 - |
+             G5 - E5 - C5 - E5 G5 | A5 - F#5 - D5 - F#5 A5 | B5 - - - G5 - E5 - | E5 - - - . . . .`,
+  },
+  // Der Drache: das große Finale, d-Moll
+  dragon: {
+    bpm: 160, lead: 'pulse25', bass: 'pulse', arp: 'up', drums: 'k h s h k k s h | k h s h k s s s',
+    chords: 'Dm Bb C A Dm Bb Gm A',
+    melody: `D5 D5 F5 D5 A5 - G5 F5 | F5 - D5 - Bb4 - D5 - | E5 E5 G5 E5 C6 - Bb5 A5 | A5 - E5 - C#5 - E5 - |
+             F5 - A5 - D6 - - A5 | Bb5 - A5 - G5 - F5 - | G5 - Bb5 - D6 - Bb5 G5 | A5 - - - C#6 - E6 -`,
+  },
   // Bosskampf: schnell und spannend, c-Moll
   boss: {
     bpm: 150, lead: 'pulse25', bass: 'pulse', arp: 'up', drums: 'k h s h k k s h | k h s h k k s s',
@@ -87,7 +101,7 @@ export const SONGS = {
 };
 
 // Welches Stück wo läuft
-export const MAP_SONG = { village: 'village', school: 'inside', shop: 'inside', cave: 'cave', under: 'cave', lair: 'cave', haunted: 'haunted', valley: 'valley', mountain: 'mountain', dwarf: 'dwarf' };
+export const MAP_SONG = { village: 'village', school: 'inside', shop: 'inside', cave: 'cave', under: 'cave', lair: 'cave', haunted: 'haunted', valley: 'valley', mountain: 'mountain', dwarf: 'dwarf', maze1: 'valley', maze2: 'cave', maze3: 'lava' };
 
 // --- Stück in Noten-Ereignisse übersetzen (Raster: Sechzehntel) ---------------------------
 

@@ -32,10 +32,16 @@ export const T = {
   // Zwergenhallen
   PLATE: 32,    // Druckplatte (Stein)
   GPLATE: 33,   // goldene Druckplatte am Runentor
+  // Labyrinthe und Drachenhort
+  LWALL: 34,    // Basaltwand (Lavahöhle)
+  LFLOOR: 35,   // Lavahöhlenboden
+  LAVA: 36,     // Lava (nicht begehbar)
+  PIT: 37,      // Loch im Boden – führt zu einem anderen Loch
+  FISSURE: 38,  // glühender Erdriss (Drachenkampf, nicht begehbar)
 };
 const SOLID = new Set([T.WATER, T.TREE, T.FENCE, T.BUSH, T.ROCK, T.GATE, T.BOULDER, T.DIGFENCE,
-  T.CWALL, T.EWALL, T.LOCKED, T.BARS, T.IWALL, T.RDOOR, T.RGATE, T.CLIFF, T.CRACK, T.CHASM]);
-const FLOORISH = new Set([T.GRASS, T.FLOWER, T.CFLOOR, T.MUSH, T.WOOD, T.PLATE]); // hierauf darf ein Fels geschoben werden
+  T.CWALL, T.EWALL, T.LOCKED, T.BARS, T.IWALL, T.RDOOR, T.RGATE, T.CLIFF, T.CRACK, T.CHASM, T.LWALL, T.LAVA, T.FISSURE]);
+const FLOORISH = new Set([T.GRASS, T.FLOWER, T.CFLOOR, T.MUSH, T.WOOD, T.PLATE, T.LFLOOR]); // hierauf darf ein Fels geschoben werden
 
 // Generischer Kartenbaukasten. Liefert das Kartenobjekt mit Bau-Helfern (b.*).
 export function makeMap({ id, w, h, fill, edge, theme }) {
@@ -141,6 +147,14 @@ function variant(world, tx, ty, t, frame) {
       return (f(tx, ty - 1) ? 1 : 0) | (f(tx + 1, ty) ? 2 : 0) | (f(tx, ty + 1) ? 4 : 0) | (f(tx - 1, ty) ? 8 : 0);
     }
     case T.CFLOOR: case T.MUSH: return hash(tx, ty) % 4;
+    case T.LWALL: {
+      const below = tl(tx, ty + 1);
+      return (!SOLID.has(below) ? 1 : 0) + (hash(tx, ty) % 3) * 2;
+    }
+    case T.LFLOOR: return hash(tx, ty) % 4;
+    case T.LAVA: return frame % 2;
+    case T.FISSURE: return frame % 2;
+    case T.PIT: return world.theme === 'cave' ? 1 : world.theme === 'lava' ? 2 : 0;
     case T.CWALL: case T.EWALL: {
       // Wandfront, wenn darunter begehbarer Boden liegt
       const below = tl(tx, ty + 1);
@@ -152,7 +166,7 @@ function variant(world, tx, ty, t, frame) {
       const r = (x, y) => tl(x, y) === T.RUG;
       return (r(tx, ty - 1) ? 0 : 1) | (r(tx + 1, ty) ? 0 : 2) | (r(tx, ty + 1) ? 0 : 4) | (r(tx - 1, ty) ? 0 : 8);
     }
-    case T.BOULDER: return world.theme === 'cave' ? 1 : world.theme === 'haunted' ? 2 : 0;
+    case T.BOULDER: return world.theme === 'cave' ? 1 : world.theme === 'haunted' ? 2 : world.theme === 'lava' ? 3 : 0;
     case T.BARS: case T.LOCKED: case T.CRACK: return world.theme === 'valley' ? 1 : 0;
     case T.CLIFF: {
       const isC = (x, y) => { const n = tl(x, y); return n === T.CLIFF || n === T.LOCKED || n === T.BARS || n === T.CAVEIN || n === T.TREE; };
@@ -182,6 +196,7 @@ export const TALL = new Set([T.TREE, T.BUSH, T.ROCK, T.BOULDER, T.CRACK, T.FENCE
 // Bodenkachel unter einer hohen Kachel
 function baseTile(world, t) {
   if (world.theme === 'cave') return T.CFLOOR;
+  if (world.theme === 'lava') return T.LFLOOR;
   if (world.theme === 'inside' || (world.theme === 'haunted' && t === T.BOULDER)) return T.WOOD;
   return T.GRASS;
 }
@@ -456,7 +471,7 @@ const PAINT = {
 
   [T.BOULDER](g, v) {
     if (v === 2) { paintChest(g); return; }
-    if (v) PAINT[T.CFLOOR](g, 1); else paintGrass(g, 3);
+    if (v === 3) PAINT[T.LFLOOR](g, 1); else if (v) PAINT[T.CFLOOR](g, 1); else paintGrass(g, 3);
     px(g, 'rgba(0,0,0,0.25)', 1, 13, 14, 3);
     blob(g, 8, 8, 7.8, 7.4, (d, dx, dy) => {
       if (d > 0.84) return '#2e2620';
@@ -675,6 +690,38 @@ const PAINT = {
     px(g, '#d8a830', 2, 3, 12, 11);
     px(g, '#f8e070', 2, 3, 12, 2);
     px(g, '#a87818', 5, 6, 6, 5); px(g, '#f8e070', 7, 8, 2, 1);
+  },
+
+  [T.LFLOOR](g, v) {
+    if (NOBG) return;
+    px(g, '#4a2a26', 0, 0, 16, 16);
+    const r = rng(900 + v * 11);
+    for (let i = 0; i < 6; i++) { const x = (r() * 15) | 0, y = (r() * 15) | 0; px(g, '#38201c', x, y + 1, 2, 1); px(g, '#64403a', x, y, 2, 1); }
+    if (v === 2) { px(g, '#c8481a', 4, 9, 4, 1); px(g, '#ff8a2a', 5, 9, 2, 1); }
+  },
+
+  [T.LWALL](g, v) {
+    paintRockWall(g, v, '#4a3a40', '#1c1418', '#6a5860');
+    if (v & 1) { px(g, '#e85a1a', 3 + (v >> 1) * 3, 9, 1, 4); px(g, '#ffa040', 3 + (v >> 1) * 3, 10, 1, 1); }
+  },
+
+  [T.LAVA](g, frame) {
+    px(g, '#c8381a', 0, 0, 16, 16);
+    const r = rng(77 + frame);
+    for (let i = 0; i < 7; i++) { const x = (r() * 14) | 0, y = (r() * 14) | 0; px(g, '#ff8a2a', x, y, 3, 1); px(g, '#ffd060', x + 1, y, 1, 1); }
+    px(g, '#8a2412', 0, 0, 16, 1);
+  },
+
+  [T.FISSURE](g, frame) {
+    PAINT[T.LFLOOR](g, 0);
+    px(g, '#1a0a08', 2, 6, 12, 5);
+    px(g, frame ? '#ff8a2a' : '#e8481a', 3, 7, 10, 3);
+    px(g, '#ffd060', 5 + frame * 3, 8, 3, 1);
+  },
+
+  [T.PIT](g, v) {
+    if (v === 1) PAINT[T.CFLOOR](g, 0); else if (v === 2) PAINT[T.LFLOOR](g, 0); else paintGrass(g, 2);
+    blob(g, 8, 9, 6.8, 5.8, (d, dx, dy) => (d > 0.8 ? (dy < 0 ? '#2a1a10' : '#6e5a48') : dy < -0.1 ? '#050302' : '#140c08'));
   },
 
   [T.CRACK](g, v) {

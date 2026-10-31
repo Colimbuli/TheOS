@@ -13,7 +13,7 @@ export function snapshot(game) {
     mapId: game.mapId, x: L.x, y: L.y, dir: L.dir,
     party: game.party.map((m) => m.id),
     stats: game.stats, step: game.step, owned: game.owned,
-    quizWrong: game.quizWrong, starter: game.starter, rec: game.rec, dw: game.dw, mama: game.mama, theoFound: game.theoFound, mtn: game.mtn,
+    quizWrong: game.quizWrong, starter: game.starter, rec: game.rec, dw: game.dw, lab: game.lab, drg: { won: game.drg.won }, mama: game.mama, theoFound: game.theoFound, mtn: game.mtn,
     diamonds: game.diamonds, ammo: game.ammo, hasCloak: game.hasCloak,
     cave: game.cave, haunt: game.haunt, valley: game.valley, quizStats: game.quizStats, quizIntro: game.quizIntro,
     seenHints: game.seenHints, checkpoint: game.checkpoint,
@@ -47,10 +47,13 @@ const OWN = ['shield', 'strength', 'dig', 'invis', 'sling', 'shovel', 'shield2',
 const VALLEY = ['sword', 'key', 'lever', 'door', 'troll', 'done'];
 const CAVE = ['dug', 'boulder', 'key', 'door', 'statue', 'troll', 'lever', 'secret', 'done'];
 const HAUNT = ['gate', 'front', 'count', 'chest', 'lib', 'candles', 'king', 'door6', 'done'];
-const MAPS = ['village', 'cave', 'haunted', 'valley', 'under', 'mountain', 'lair', 'dwarf'];
+const MAPS = ['village', 'cave', 'haunted', 'valley', 'under', 'mountain', 'lair', 'dwarf', 'maze1', 'maze2', 'maze3', 'arena'];
+const LATE = ['gate', 'done', 'won'];
 const DW = ['theo', 'felix', 'ferd', 'fried', 'lino', 'jelly', 'plates', 'lock', 'done'];
 const STARTERS = ['theo', 'felix', 'ferdinand', 'friedrich', 'lino'];
 const MTN = ['statue', 'wall', 'rocks', 'key', 'boss', 'jelly', 'done'];
+
+const mapIndex = (s) => Math.max(0, MAPS.indexOf(s.mapId === 'school' || s.mapId === 'shop' ? 'village' : s.mapId));
 
 // Feldliste: [Bitbreite, Wert lesen]. v = 1 (16 Zeichen), 2 (20 Zeichen) oder 3 (aktuell, 24 Zeichen, mit Lino)
 function fields(v = 3) {
@@ -58,7 +61,11 @@ function fields(v = 3) {
   // Kapitel 5 und die freie Startfigur stecken in den obersten 14 Bits – die waren in v2-Codes
   // immer 0, deshalb bleiben alte Codes gültig (Startfigur Theo, Kapitel 5 nicht begonnen).
   return [
-    ...(v === 3 ? [[9, (s) => flags(DW, s.dw)]] : []),
+    ...(v === 3 ? [
+      [2, (s) => mapIndex(s) >> 3],
+      [3, (s) => flags(LATE, { gate: s.lab && s.lab.gate, done: s.lab && s.lab.done, won: s.drg && s.drg.won })],
+      [9, (s) => flags(DW, s.dw)],
+    ] : []),
     ...(v === 1 ? [] : [
       [v === 3 ? 3 : 2, (s) => Math.max(0, STARTERS.indexOf(s.starter || 'theo'))],
       [v === 3 ? 5 : 4, (s) => flags(STARTERS, s.rec)],
@@ -77,19 +84,19 @@ function fields(v = 3) {
     [9, (s) => flags(HAUNT, s.haunt)],
     [5, (s) => (s.haunt && s.haunt.target) || 5],
     ...(v === 1 ? [] : [[6, (s) => flags(VALLEY, s.valley)]]),
-    [v === 1 ? 2 : 3, (s) => Math.max(0, MAPS.indexOf(s.mapId === 'school' || s.mapId === 'shop' ? 'village' : s.mapId))],
+    [v === 1 ? 2 : 3, (s) => mapIndex(s) & 7],
   ];
 }
 
 const LEN = { 1: 16, 2: 20, 3: 24 };
-const BYTES = { 1: 10, 2: 12, 3: 13 };
+const BYTES = { 1: 10, 2: 12, 3: 14 };
 
 // FNV-1a über alle Bytes – erkennt Tippfehler zuverlässig
-function checksum12(n) { return checksum(n, 2); }
+function checksum(n, v = 3) { return checksumN(n, BYTES[v]); }
 
-function checksum(n, v = 3) {
+function checksumN(n, bytes) {
   let h = 0x811c9dc5;
-  for (let i = 0; i < BYTES[v]; i++) { h ^= Number((n >> BigInt(i * 8)) & 255n); h = Math.imul(h, 0x01000193) >>> 0; }
+  for (let i = 0; i < bytes; i++) { h ^= Number((n >> BigInt(i * 8)) & 255n); h = Math.imul(h, 0x01000193) >>> 0; }
   return (h ^ (h >>> 8) ^ (h >>> 16) ^ (h >>> 24)) & 255;
 }
 
@@ -116,14 +123,18 @@ export function decodeCode(code) {
   const sum = Number(n & 255n);
   n >>= 8n;
   // v3-Codes von vor Kapitel 6 hatten nur 12 Prüfbytes (oberstes Byte war 0)
-  if (checksum(n, v) !== sum && !(v === 3 && (n >> 96n) === 0n && checksum12(n) === sum)) return null;
+  // Ältere v3-Codes hatten weniger Prüfbytes (die oberen Bytes waren 0)
+  const ok = checksum(n, v) === sum
+    || (v === 3 && (n >> 104n) === 0n && checksumN(n, 13) === sum)
+    || (v === 3 && (n >> 96n) === 0n && checksumN(n, 12) === sum);
+  if (!ok) return null;
   const f = fields(v);
   const vals = [];
   for (let i = f.length - 1; i >= 0; i--) { const bits = f[i][0]; vals.unshift(Number(n & BigInt((1 << bits) - 1))); n >>= BigInt(bits); }
   if (n !== 0n) return null; // ungenutzte Bits müssen 0 sein (fängt Tippfehler am Anfang ab)
   if (v === 1) { vals.splice(11, 0, 0); vals.unshift(0, 0, 0, 0); } // alte Codes: kein Tal-Fortschritt
-  if (v !== 3) vals.unshift(0);
-  const [dw, starter, rec, mama, mtn, step, cloak, own, hearts, diamonds, ammo, level, xp, cave, haunt, target, valley, map] = vals;
+  if (v !== 3) vals.unshift(0, 0, 0);
+  const [mapExt, late, dw, starter, rec, mama, mtn, step, cloak, own, hearts, diamonds, ammo, level, xp, cave, haunt, target, valley, map] = vals;
   const unpack = (names, v) => Object.fromEntries(names.map((nm, i) => [nm, !!(v >> i & 1)]));
   const owned = Object.fromEntries(OWN.filter((_, i) => own >> i & 1).map((k) => [k, true]));
   if (hearts) owned.heart = hearts;
@@ -131,6 +142,7 @@ export function decodeCode(code) {
     step, hasCloak: !!cloak, owned, diamonds, ammo, level: Math.max(1, level), xp,
     cave: unpack(CAVE, cave), haunt: { ...unpack(HAUNT, haunt), target: Math.max(5, target) }, valley: unpack(VALLEY, valley),
     starter: STARTERS[starter], rec: unpack(STARTERS, rec), mama: mama ? 2 : 0, mtn: unpack(MTN, mtn), dw: unpack(DW, dw),
-    mapId: MAPS[map] || 'village',
+    lab: { gate: !!(late & 1), done: !!(late & 2) }, drg: { won: !!(late & 4) },
+    mapId: MAPS[(mapExt << 3) | map] || 'village',
   };
 }

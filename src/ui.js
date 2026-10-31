@@ -317,7 +317,7 @@ export class RiddleUI {
 // --- Pause-Menü: Speichern, Laden, Speichercode ------------------------------------
 
 const MAP_NAMES = { village: 'Lindental', school: 'Schule', shop: 'Brunos Laden', cave: 'Höhle', haunted: 'Spukhaus',
-  valley: 'Tal der Trolle', under: 'Unterwelt', mountain: 'Bergpfad', lair: 'Felsmonster-Höhle', dwarf: 'Zwergenhallen' };
+  valley: 'Tal der Trolle', under: 'Unterwelt', mountain: 'Bergpfad', lair: 'Felsmonster-Höhle', dwarf: 'Zwergenhallen', maze1: 'Waldlabyrinth', maze2: 'Höhlenlabyrinth', maze3: 'Lavalabyrinth', arena: 'Drachenhort' };
 
 function slotLabel(d) {
   if (!d) return { name: '– leer –', info: '' };
@@ -432,7 +432,7 @@ export class ChapterUI {
     const n = this.chapters.length + 1;
     const d = this.nav(input, dt);
     if (d) { this.sel = (this.sel + d + n) % n; this.fx.sfx.blip(); }
-    for (let i = 0; i < n; i++) if (hit(tap, 24, 22 + i * 19, 192, 17)) { this.sel = i; input.aPressed = true; }
+    for (let i = 0; i < n; i++) if (hit(tap, 24, 20 + i * 13, 192, 12)) { this.sel = i; input.aPressed = true; }
     if (input.bPressed || input.menuPressed) { this.closed = true; return; }
     if (input.aPressed) {
       this.closed = true;
@@ -444,13 +444,13 @@ export class ChapterUI {
     panel(g);
     text('Kapitel wählen', 9, 7, { size: 6, color: '#f8d848' });
     [...this.chapters, { name: 'Zurück' }].forEach((c, i) => {
-      const y = 22 + i * 19, sel = i === this.sel;
-      g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(24, y, 192, 17);
-      if (sel) { g.fillStyle = '#f8d848'; g.fillRect(24, y, 2, 17); }
+      const y = 20 + i * 13, sel = i === this.sel;
+      g.fillStyle = sel ? '#3a58c8' : '#1c2850'; g.fillRect(24, y, 192, 12);
+      if (sel) { g.fillStyle = '#f8d848'; g.fillRect(24, y, 2, 12); }
       if (c.n) {
-        text(`${c.n}`, 34, y + 6, { size: 6, color: '#f8d848' });
-        text(c.name, 50, y + 6, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
-      } else text(c.name, 34, y + 6, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
+        text(`${c.n}`, 34, y + 3, { size: 6, color: '#f8d848' });
+        text(c.name, 50, y + 3, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
+      } else text(c.name, 34, y + 3, { size: 6, color: sel ? '#ffffff' : '#c8d0e8' });
     });
     text('Startet mit allen Fähigkeiten bis dahin', W / 2, 142, { size: 5, align: 'center', color: '#a8b8d8' });
     text('A: starten   B: zurück', W / 2, 151, { size: 5, align: 'center', color: '#8898c0' });

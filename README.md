@@ -110,6 +110,22 @@ Fähigkeit eines anderen Kindes – die Reihenfolge ist frei. **Neu: Die Gruppe 
 Danach müssen drei Kinder gleichzeitig auf den goldenen Platten stehen, und das Runenschloss will
 3 Schulaufgaben in Folge. Dann öffnet sich die Treppe zum Drachenhort.
 
+**7 – Die drei Labyrinthe** (nach Theos Karte): Wald, Höhle und Lavahöhle. Löcher im Boden sind paarweise
+verbunden (ohne Beschriftung – ausprobieren!), manche führen in Schatzkammern. Die Lavahöhle ist geteilt:
+Zum Ausgang kommt man nur über das Nebenlabyrinth. Die glühende Tür am Ausgang will 3 Schulaufgaben in Folge.
+Wer erschöpft ist, startet wieder am Eingang von Labyrinth 1.
+
+**8 – Der Drache vom Buttenberg** (nach Theos Steckbrief): Betritt man den Kampfplatz, wird der Durchgang verschüttet.
+
+| Attacke des Drachen | Was hilft |
+|---|---|
+| Lavabad – heilt sich um 40 | Felix schiebt zwei Felsen ins Lavabecken, dann ist es kalt |
+| Hitzestrahl | Theos Schild wirft die Feuerbälle zurück (Hauptschaden) |
+| Erdkräfte – Risse, aus denen Lava spritzt | Lino (Spaghetti-Beine), Jelly springt über die Risse |
+| Ulti Feuerflug – greift aus der Luft an | Friedrich unsichtbar; Runenstein: 3 Rätsel in Folge holen den Drachen herunter → Schwert |
+
+Wer im Kampf erschöpft ist, beginnt den Kampf neu. Nach dem Sieg geht es heim nach Lindental.
+
 Der Spielstand wird automatisch im Browser gespeichert („Weiterspielen“ im Titelbild).
 Im Spiel öffnet **Esc / P** (Gamepad: Start, Touch: ☰) das Menü: 3 Speicherplätze und ein **Speichercode**
 zum Abschreiben (auch als Link: `?code=XXXX-XXXX-XXXX-XXXX-XXXX-XXXX`). Über **Kapitel wählen** im Titelbild
@@ -130,7 +146,7 @@ projiziert (`Tilt.warpGround` in `src/tilt.js`).
 ## Musik
 
 Eigene 8-Bit-Stücke, live im Browser erzeugt (`src/music.js`, keine Audiodateien): Titel, Dorf, Schule/Laden,
-Höhlen, Spukhaus, Tal der Trolle, Bergpfad, Zwergenhallen und ein Boss-Thema für Troll und Riesen-Felsmonster. Beim Ortswechsel
+Höhlen, Spukhaus, Tal der Trolle, Bergpfad, Zwergenhallen, Lavahöhle, ein Boss-Thema und das Drachen-Finale für Troll und Riesen-Felsmonster. Beim Ortswechsel
 wird übergeblendet. Ein/aus mit **M** oder im Pause-Menü; der Browser merkt sich die Einstellung.
 Neue Stücke: in `SONGS` Tempo, Akkorde (1 pro Takt) und Melodie (8 Achtel pro Takt) eintragen –
 Bass, Begleitung und Schlagzeug entstehen automatisch.
@@ -203,7 +219,7 @@ python -m http.server 8000
 ```
 index.html        Seite, Touch-Steuerung, Styles
 src/main.js       Spielschleife, Gruppe, Fähigkeiten, Kampf, Kartenwechsel, HUD
-src/maps.js       Karten: Dorf, Schule, Laden, Höhle, Spukhaus, Tal der Trolle + Unterwelt, Bergpfad + Felsmonster-Höhle, Zwergenhallen
+src/maps.js       Karten: Dorf, Schule, Laden, Höhle, Spukhaus, Tal der Trolle + Unterwelt, Bergpfad + Felsmonster-Höhle, Zwergenhallen, Labyrinthe, Drachenhort
 src/world.js      Tile-System, Kollision, Tile- und Objektgrafik
 src/npcs.js       Figuren, Dialoge, Quest-Schritte und Hinweise
 src/quiz.js       Lernaufgaben der Schule (Fragenpools + Mathe-Generator)

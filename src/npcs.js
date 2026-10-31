@@ -86,6 +86,10 @@ const LOTTE_TIPS = {
 
 export function questHint(game) {
   if (game.mapId === 'dwarf') return dwarfHint(game);
+  if (game.mapId === 'maze1') return 'Quest: Findet den Weg durch den Wald';
+  if (game.mapId === 'maze2') return 'Quest: Findet den Weg durch die Höhle';
+  if (game.mapId === 'maze3') return game.lab.gate ? 'Ziel: Durch die Tür zum Drachen' : 'Quest: Findet den Ausgang der Lavahöhle';
+  if (game.mapId === 'arena') return game.drg.won ? 'Der Drache ist besiegt!' : 'Quest: Besiegt den Drachen!';
   if (game.mapId === 'mountain' || game.mapId === 'lair') return mountainHint(game);
   if (game.mapId === 'valley' || game.mapId === 'under') return valleyHint(game);
   if (game.mapId === 'haunted') return hauntHint(game);
@@ -316,6 +320,7 @@ export function talkTo(n, game, fx) {
       return { lines: ['Troll: GRRR! Hier kommt keiner durch, den ich sehe!'] };
 
     case 'konrad':
+      if (game.drg && game.drg.won) return { lines: ['Wache Konrad: Die Drachenbezwinger! Ganz Lindental redet von euch!'] };
       if (game.step >= 7) return { lines: ['Wache Konrad: Fünf kleine Helden... Passt bloß auf euch auf am Buttenberg!'] };
       return { lines: [
         'Wache Konrad: Halt! Zum Buttenberg lasse ich keine Kinder durch.',

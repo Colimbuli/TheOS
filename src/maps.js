@@ -424,7 +424,6 @@ export function createValley() {
     const [ax, ay] = ARRIVE_UNDER[k];
     map.warps.push({ x, y, to: 'under', tx: ax * TILE, ty: ay * TILE, dir: 0, letter: k });
   }
-  map.labels = Object.entries(HOLES_VALLEY).map(([k, [x, y]]) => ({ x: x * TILE + 8, y: y * TILE - 7, text: k }));
 
   // Deko
   for (const [x, y] of [[6, 24], [25, 26], [9, 27], [21, 27], [6, 3], [24, 4], [14, 20], [17, 14], [25, 10], [6, 16]]) b.set(x, y, T.BUSH);
@@ -499,7 +498,6 @@ export function createUnder() {
     const [ax, ay] = ARRIVE_VALLEY[k];
     map.warps.push({ x, y, to: 'valley', tx: ax * TILE, ty: ay * TILE, dir: 0, letter: k });
   }
-  map.labels = Object.entries(HOLES_UNDER).map(([k, [x, y]]) => ({ x: x * TILE + 8, y: y * TILE - 6, text: k }));
 
   for (const [x, y] of [[22, 16], [26, 16], [8, 15], [4, 2], [14, 8], [16, 1], [23, 8], [12, 17]]) addObj(b, { type: 'torch', x, y }, drawTorch, 0);
   for (const [x, y] of [[8, 3], [17, 9], [26, 9]]) { addObj(b, { type: 'brazier', x, y, glow: true }, drawBrazier); b.solid(x, y); }
@@ -772,4 +770,229 @@ export function createDwarf() {
   ];
   map.warps.push({ x: 19, y: 30, to: 'lair', tx: 2 * TILE, ty: 2 * TILE + 4, dir: 0 }, { x: 20, y: 30, to: 'lair', tx: 2 * TILE, ty: 2 * TILE + 4, dir: 0 });
   return map;
+}
+
+// --- Kapitel 7: Die drei Labyrinthe (nach Theos Karte) --------------------------------------
+//
+// Labyrinth 1 = Wald, 2 = Höhle, 3 = Lavahöhle. Gleiche Buchstaben auf Theos Karte = verbundene Löcher
+// (im Spiel ohne Beschriftung). Die Gänge entstehen mit festem Zufallswert – Größe, Aufteilung und Lage
+// der Löcher folgen der Karte.
+
+// Labyrinth auf einem Zellenraster graben (Zelle = 1 Kachel, dazwischen Wände).
+// regionOf(cx, cy) trennt Bereiche, die nur über Löcher verbunden sind.
+function carveMaze(b, map, { ox, oy, cw, ch, seed, floor, regionOf = () => 0, loops = 0 }) {
+  const r = rng(seed);
+  const T0 = (cx, cy) => [ox + 1 + cx * 2, oy + 1 + cy * 2];
+  const seen = new Set();
+  const key = (x, y) => `${x},${y}`;
+  const cells = [];
+  for (let cy = 0; cy < ch; cy++) for (let cx = 0; cx < cw; cx++) cells.push([cx, cy]);
+  for (const [sx, sy] of cells) {
+    if (seen.has(key(sx, sy))) continue;
+    const reg = regionOf(sx, sy);
+    const stack = [[sx, sy]];
+    seen.add(key(sx, sy));
+    b.set(...T0(sx, sy), floor);
+    while (stack.length) {
+      const [cx, cy] = stack[stack.length - 1];
+      const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [cx + dx, cy + dy, dx, dy])
+        .filter(([nx, ny]) => nx >= 0 && ny >= 0 && nx < cw && ny < ch && !seen.has(key(nx, ny)) && regionOf(nx, ny) === reg);
+      if (!nb.length) { stack.pop(); continue; }
+      const [nx, ny, dx, dy] = nb[(r() * nb.length) | 0];
+      const [tx, ty] = T0(cx, cy);
+      b.set(tx + dx, ty + dy, floor);
+      b.set(...T0(nx, ny), floor);
+      seen.add(key(nx, ny));
+      stack.push([nx, ny]);
+    }
+  }
+  // ein paar Schleifen, damit es nicht nur Sackgassen gibt
+  for (let i = 0; i < loops; i++) {
+    const cx = (r() * (cw - 1)) | 0, cy = (r() * ch) | 0;
+    if (regionOf(cx, cy) !== regionOf(cx + 1, cy)) continue;
+    const [tx, ty] = T0(cx, cy);
+    b.set(tx + 1, ty, floor);
+  }
+  // Sackgassen (für Gegenstände und Gegner)
+  const dead = cells.filter(([cx, cy]) => {
+    const [tx, ty] = T0(cx, cy);
+    return [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => map.tile(tx + dx, ty + dy) === floor).length === 1;
+  }).map(([cx, cy]) => T0(cx, cy));
+  return { at: T0, dead, rnd: r };
+}
+
+// Ein Loch und wohin es führt; Ankunft auf einem freien Nachbarfeld.
+// In Labyrinthen liegt das Loch in einer Wandnische neben der Zelle – so schneidet es keinen Gang ab.
+function pit(map, b, x, y, to, tx, ty, floor) {
+  if (floor !== 'room') {
+    const wall = map.tile(x, y);
+    void wall;
+    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx <= 0 || ny <= 0 || nx >= map.w - 1 || ny >= map.h - 1) continue;
+      if (!map.isSolidTile(nx, ny) || map.tile(nx, ny) === T.PIT) continue;
+      // nur echte Wand zwischen zwei Gängen oder zum Rand – nicht schon eine andere Nische
+      x = nx; y = ny;
+      break;
+    }
+  }
+  b.set(x, y, T.PIT);
+  const free = [[0, 1], [1, 0], [-1, 0], [0, -1]].map(([dx, dy]) => [tx + dx, ty + dy]);
+  map.pits.push({ x, y, to, tx, ty, free });
+  void floor;
+}
+
+// Ankunftsfeld neben dem Ziel-Loch bestimmen (nach dem Bau aller Karten)
+export function linkPits(maps) {
+  for (const m of Object.values(maps)) {
+    for (const p of m.pits || []) {
+      const dest = maps[p.to];
+      const self = !dest.isSolidTile(p.tx, p.ty) && dest.tile(p.tx, p.ty) !== T.PIT ? [p.tx, p.ty] : null;
+      const [ax, ay] = self || p.free.find(([x, y]) => !dest.isSolidTile(x, y) && dest.tile(x, y) !== T.PIT) || [p.tx, p.ty + 1];
+      m.warps.push({ x: p.x, y: p.y, to: p.to, tx: ax * TILE, ty: ay * TILE - 4, dir: 0, pit: true });
+    }
+  }
+}
+
+function sprinkle(map, dead, list, avoid, r) {
+  const used = new Set(avoid.map(([x, y]) => `${x},${y}`));
+  const pick = () => {
+    for (let i = 0; i < 40; i++) {
+      const c = dead[(r() * dead.length) | 0];
+      if (c && !used.has(`${c[0]},${c[1]}`)) { used.add(`${c[0]},${c[1]}`); return c; }
+    }
+    return null;
+  };
+  let n = 0;
+  for (const [kind, type, count] of list) {
+    for (let i = 0; i < count; i++) {
+      const c = pick();
+      if (!c) continue;
+      if (kind === 'item') map.items.push({ id: `${map.id}-${n++}`, type, x: c[0] * TILE + 2, y: c[1] * TILE + 2, taken: false });
+      else map.enemySpawns.push({ type, x: c[0], y: c[1] });
+    }
+  }
+}
+
+export const MAZE1_SPAWN = { x: 7 * TILE, y: 2 * TILE, dir: 0 };
+
+export function createMaze1() {
+  const { map, b } = makeMap({ id: 'maze1', w: 26, h: 21, fill: T.TREE, edge: T.TREE, theme: 'valley' });
+  map.pits = []; map.enemySpawns = [];
+  const mz = carveMaze(b, map, { ox: 0, oy: 1, cw: 8, ch: 9, seed: 701, floor: T.GRASS, loops: 6 });
+  b.set(7, 1, T.GRASS); b.set(7, 0, T.UP);                         // Eingang (zurück in die Zwergenhallen)
+  map.warps.push({ x: 7, y: 0, to: 'dwarf', tx: 19 * TILE + 8, ty: 3 * TILE, dir: 0 });
+  const [ax, ay] = mz.at(7, 7), [bx, by] = mz.at(0, 7);
+  pit(map, b, ax, ay, 'maze2', ...mazeCell('maze2', 4, 0));       // A
+  pit(map, b, bx, by, 'maze1', 21, 4);                             // B → Schatzkammer
+  // Schatzkammer B
+  b.rect(20, 3, 4, 4, T.GRASS);
+  pit(map, b, 21, 4, 'maze1', bx, by, 'room');
+  map.items.push({ id: 'm1b1', type: 'crystal', x: 22 * TILE + 2, y: 4 * TILE + 2, taken: false },
+    { id: 'm1b2', type: 'crystal', x: 21 * TILE + 2, y: 5 * TILE + 2, taken: false },
+    { id: 'm1b3', type: 'apple', x: 22 * TILE + 2, y: 5 * TILE + 2, taken: false });
+  sprinkle(map, mz.dead, [['item', 'crystal', 3], ['item', 'apple', 2], ['enemy', 'slime', 3], ['enemy', 'bat', 2], ['enemy', 'mtroll', 2]], [[ax, ay], [bx, by], [7, 2], [7, 1]], mz.rnd);
+  const r = rng(77);
+  for (let i = 0; i < 25; i++) { const x = 1 + ((r() * 15) | 0), y = 2 + ((r() * 17) | 0); if (map.tile(x, y) === T.GRASS) b.set(x, y, T.FLOWER); }
+  map.hints = [[1, 1, 15, 4, 'Labyrinth 1: der Wald. Irgendwo führt ein Loch tiefer hinein ...']];
+  map.checkpoints = [];
+  return map;
+}
+
+// Zellmitte eines Labyrinths in Kachelkoordinaten (für die Lochverbindungen)
+const MAZE_ORIGIN = { maze2: [0, 0], maze2side: [21, 2], maze3: [0, 0], maze3right: [21, 1] };
+function mazeCell(name, cx, cy) { const [ox, oy] = MAZE_ORIGIN[name]; return [ox + 1 + cx * 2, oy + 1 + cy * 2]; }
+
+export function createMaze2() {
+  const { map, b } = makeMap({ id: 'maze2', w: 33, h: 21, fill: T.CWALL, edge: T.CWALL, theme: 'cave' });
+  map.pits = []; map.enemySpawns = [];
+  const mz = carveMaze(b, map, { ox: 0, oy: 0, cw: 9, ch: 9, seed: 802, floor: T.CFLOOR, loops: 8 });
+  const side = carveMaze(b, map, { ox: 21, oy: 2, cw: 5, ch: 5, seed: 803, floor: T.CFLOOR, loops: 2 });
+  const A = mz.at(4, 0), C = mz.at(4, 5), D = mz.at(6, 7);
+  const C2 = side.at(0, 0), G = side.at(4, 2);
+  pit(map, b, ...A, 'maze1', ...mazeCellM1(7, 7));
+  pit(map, b, ...C, 'maze2', ...C2);
+  pit(map, b, ...D, 'maze3', ...mazeCell('maze3', 2, 4));
+  pit(map, b, ...C2, 'maze2', ...C);
+  pit(map, b, ...G, 'maze2', 23, 17);
+  // Schatzkammer G: acht Diamanten rund um das Loch
+  b.rect(22, 16, 3, 3, T.CFLOOR);
+  pit(map, b, 23, 17, 'maze2', ...G, 'room');
+  let k = 0;
+  for (let y = 16; y <= 18; y++) for (let x = 22; x <= 24; x++) if (x !== 23 || y !== 17) map.items.push({ id: `m2g${k++}`, type: 'crystal', x: x * TILE + 2, y: y * TILE + 2, taken: false });
+  sprinkle(map, mz.dead, [['item', 'crystal', 2], ['item', 'apple', 3], ['enemy', 'kobold', 3], ['enemy', 'bat', 2], ['enemy', 'slime', 2]], [A, C, D], mz.rnd);
+  sprinkle(map, side.dead, [['item', 'apple', 1], ['enemy', 'bat', 1]], [C2, G], side.rnd);
+  for (const [x, y] of mz.dead.slice(0, 6)) addObj(b, { type: 'torch', x, y: y - 1 }, drawTorch, 0);
+  map.hints = [[1, 1, 17, 3, 'Labyrinth 2: die Höhle. Vorsicht, Feuer-Kobolde!']];
+  map.checkpoints = [];
+  return map;
+}
+function mazeCellM1(cx, cy) { return [1 + cx * 2, 2 + cy * 2]; }
+
+export function createMaze3() {
+  const { map, b } = makeMap({ id: 'maze3', w: 41, h: 27, fill: T.LWALL, edge: T.LWALL, theme: 'lava' });
+  map.pits = []; map.enemySpawns = [];
+  // Oberer und unterer Teil sind getrennt – nur über das rechte Labyrinth (E → F) kommt man zum Ausgang
+  const mz = carveMaze(b, map, { ox: 0, oy: 0, cw: 9, ch: 12, seed: 905, floor: T.LFLOOR, loops: 8, regionOf: (cx, cy) => (cy < 6 ? 0 : 1) });
+  const right = carveMaze(b, map, { ox: 21, oy: 1, cw: 9, ch: 10, seed: 906, floor: T.LFLOOR, loops: 6,
+    regionOf: (cx, cy) => (cx >= 3 && cx <= 5 && cy >= 4 && cy <= 6 ? 1 : 0) });
+  const D = mz.at(2, 4), E = mz.at(8, 0), H = mz.at(7, 5), F = mz.at(0, 7);
+  const E2 = right.at(0, 0), F2 = right.at(8, 9), H2 = right.at(4, 5);
+  pit(map, b, ...D, 'maze2', ...mazeCell('maze2', 6, 7));
+  pit(map, b, ...E, 'maze3', ...E2);
+  pit(map, b, ...E2, 'maze3', ...E);
+  pit(map, b, ...F2, 'maze3', ...F);
+  pit(map, b, ...F, 'maze3', ...F2);
+  pit(map, b, ...H, 'maze3', ...H2);
+  pit(map, b, ...H2, 'maze3', ...H);
+  // Ausgang zum Drachen (unten) mit Rätseltür
+  const [exX] = mz.at(4, 11);
+  b.set(exX, 24, T.LOCKED); b.rect(exX, 25, 1, 2, T.LFLOOR);
+  map.exitGate = [exX, 24];
+  // Bonus im versiegelten Kern des rechten Labyrinths
+  for (const [cx, cy] of [[3, 4], [5, 4], [3, 6], [5, 6]]) { const [x, y] = right.at(cx, cy); map.items.push({ id: `m3h${cx}${cy}`, type: 'crystal', x: x * TILE + 2, y: y * TILE + 2, taken: false }); }
+  // ein paar Lavatümpel in Sackgassen
+  const exitCell = mz.at(4, 11);
+  for (const [x, y] of mz.dead.filter((_, i) => i % 5 === 3).slice(0, 4)) if (![D, E, H, F, exitCell].some(([a, c]) => a === x && c === y)) b.set(x, y, T.LAVA);
+  sprinkle(map, mz.dead.filter(([x, y]) => map.tile(x, y) === T.LFLOOR), [['item', 'crystal', 2], ['item', 'apple', 3], ['enemy', 'kobold', 3], ['enemy', 'bat', 2], ['enemy', 'rockmon', 2]], [D, E, H, F, [exX, 23]], mz.rnd);
+  sprinkle(map, right.dead, [['item', 'apple', 1], ['enemy', 'kobold', 2], ['enemy', 'bat', 1]], [E2, F2, H2], right.rnd);
+  map.hints = [
+    [1, 1, 17, 11, 'Labyrinth 3: die Lavahöhle. Hier ist es heiß!'],
+    [1, 13, 17, 23, 'Da unten ist der Ausgang zum Drachen!'],
+  ];
+  map.checkpoints = [];
+  return map;
+}
+
+// --- Kapitel 8: Der Kampfplatz des Drachen --------------------------------------------------
+
+export const ARENA_SPAWN = { x: 10 * TILE + 8, y: 1 * TILE, dir: 0 };
+
+export function createArena() {
+  const { map, b } = makeMap({ id: 'arena', w: 22, h: 18, fill: T.LWALL, edge: T.LWALL, theme: 'lava' });
+  b.rect(2, 3, 18, 13, T.LFLOOR);
+  b.rect(10, 0, 2, 3, T.LFLOOR);                  // Durchgang (wird verschüttet)
+  map.pool = [[17, 4], [17, 5]];                   // Lavabecken des Drachen
+  for (const [x, y] of map.pool) b.set(x, y, T.LAVA);
+  map.boulders = [[13, 4], [13, 5], [5, 12]];
+  for (const [x, y] of map.boulders) { b.under(x, y, T.LFLOOR); b.set(x, y, T.BOULDER); }
+  for (const [x, y] of [[2, 3], [19, 3], [2, 15], [19, 15], [3, 9], [18, 10]]) b.set(x, y, T.LAVA);
+  map.arena = { x0: 4 * TILE, y0: 4 * TILE, x1: 16 * TILE, y1: 8 * TILE };
+  map.padTop = 40;
+  map.rune = addObj(b, { type: 'runestone', x: 10, y: 12, hidden: true }, drawRuneStone);
+  map.enemySpawns = [{ type: 'dragon', x: 10, y: 6 }];
+  for (const [x, y] of [[4, 2], [17, 2], [7, 2], [14, 2]]) addObj(b, { type: 'torch', x, y }, drawTorch, 0);
+  map.hints = [];
+  map.checkpoints = [];
+  return map;
+}
+
+// Runenstein im Drachenkampf: Rätsel lösen holt den fliegenden Drachen herunter
+function drawRuneStone(g, o, cx, cy, t) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(X + 2, Y + 12, 12, 3);
+  g.fillStyle = '#1a1020'; g.fillRect(X + 3, Y - 4, 10, 17);
+  g.fillStyle = '#6a6478'; g.fillRect(X + 4, Y - 3, 8, 15);
+  const glow = Math.floor(t * 4) % 2 ? '#88f0ff' : '#58c8ff';
+  g.fillStyle = glow; g.fillRect(X + 7, Y - 1, 2, 10); g.fillRect(X + 5, Y + 2, 6, 1); g.fillRect(X + 5, Y + 6, 6, 1);
 }
