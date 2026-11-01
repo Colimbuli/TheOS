@@ -20,6 +20,55 @@ const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); // 12345 -> 
 
 // --- Deutsch --------------------------------------------------------------------
 
+// Rechtschreibung: ie, Dehnungs-h, ss/ß/s, doppelte Mitlaute (tt, ss, ff) und ck.
+// [richtig, [drei falsche Schreibweisen]] – die falschen sind bewusst keine echten Wörter.
+const SPELL = {
+  ie: ['ie oder i? Welches Wort ist richtig geschrieben?', [
+    ['Spiegel', ['Spigel', 'Spiehgel', 'Spiegl']], ['Biene', ['Bine', 'Bihne', 'Bienne']], ['Wiese', ['Wise', 'Wihse', 'Wieße']],
+    ['fliegen', ['fligen', 'flihgen', 'fliegn']], ['Brief', ['Brif', 'Brihf', 'Brieff']], ['Riese', ['Rise', 'Rihse', 'Rieße']],
+    ['Ziel', ['Zil', 'Zihl', 'Ziehl']], ['spielen', ['spilen', 'spihlen', 'spiehlen']], ['Papier', ['Papir', 'Papihr', 'Papiehr']],
+    ['tief', ['tif', 'tihf', 'tieff']], ['Tier', ['Tir', 'Tihr', 'Tierr']]]],
+  h: ['Dehnungs-h oder nicht? Welches Wort ist richtig?', [
+    ['fahren', ['faren', 'farhen', 'fahrn']], ['Zahl', ['Zal', 'Zaal', 'Zahll']], ['Uhr', ['Uur', 'Urh', 'Uhre']],
+    ['Stuhl', ['Stul', 'Stuul', 'Stuhll']], ['fühlen', ['fülen', 'füehlen', 'fühllen']], ['Bahn', ['Baan', 'Barn', 'Bahhn']],
+    ['wohnen', ['wonen', 'woonen', 'wohen']], ['Fehler', ['Feler', 'Fähler', 'Fehhler']], ['Sohn', ['Soon', 'Sohhn', 'Son']],
+    ['Kuh', ['Ku', 'Kuu', 'Kuhh']], ['Mehl', ['Mel', 'Meel', 'Mähl']]]],
+  ss: ['ss, ß oder s? Welches Wort ist richtig geschrieben?', [
+    ['Straße', ['Strasse', 'Strase', 'Straaße']], ['Fuß', ['Fuss', 'Fus', 'Fuhs']], ['groß', ['gross', 'gros', 'grohs']],
+    ['heißen', ['heissen', 'heisen', 'heißßen']], ['Kuss', ['Kuß', 'Kus', 'Kuhs']], ['Fluss', ['Fluß', 'Flus', 'Fluhs']],
+    ['essen', ['eßen', 'esen', 'ehsen']], ['Wasser', ['Waßer', 'Waser', 'Wahser']], ['Schloss', ['Schloß', 'Schlos', 'Schlohs']],
+    ['süß', ['süss', 'süs', 'sühs']], ['müssen', ['müßen', 'müsen', 'mühsen']], ['Klasse', ['Klaße', 'Klase', 'Klahse']]]],
+  dbl: ['Doppelter Buchstabe oder nicht? Was ist richtig?', [
+    ['Mutter', ['Muter', 'Muttr', 'Mutte']], ['Bett', ['Bet', 'Bätt', 'Bettt']], ['Futter', ['Futer', 'Fuhter', 'Fuuter']],
+    ['Schiff', ['Schif', 'Schihf', 'Schieff']], ['Löffel', ['Löfel', 'Löffl', 'Lööfel']], ['treffen', ['trefen', 'träffen', 'trehfen']],
+    ['Kette', ['Kete', 'Kähte', 'Kettte']], ['Affe', ['Afe', 'Affee', 'Aaffe']], ['Tasse', ['Taße', 'Tase', 'Tahse']],
+    ['Messer', ['Meßer', 'Meser', 'Mässer']]]],
+  ck: ['ck oder k? Welches Wort ist richtig geschrieben?', [
+    ['Brücke', ['Brüke', 'Brükke', 'Brüce']], ['Zucker', ['Zuker', 'Zukker', 'Zugger']], ['backen', ['baken', 'bakken', 'bacen']],
+    ['Decke', ['Deke', 'Dekke', 'Decce']], ['Glück', ['Glük', 'Glükk', 'Glüc']], ['Jacke', ['Jake', 'Jakke', 'Jace']],
+    ['Socke', ['Soke', 'Sokke', 'Soce']], ['Rucksack', ['Ruksack', 'Rucksak', 'Rukksack']]]],
+};
+
+// Lückenwörter: Was gehört an die Stelle von _ ?
+const GAP = [
+  ['Die Stra_e', 'ß', ['ss', 's']], ['Der Flu_', 'ss', ['ß', 's']], ['Der Fu_', 'ß', ['ss', 's']], ['Das Wa_er', 'ss', ['ß', 's']],
+  ['gro_', 'ß', ['ss', 's']], ['Die Kla_e', 'ss', ['ß', 's']], ['Ich wei_, dass ...', 'ß', ['ss', 's']], ['Der Ku_', 'ss', ['ß', 's']],
+  ['Der Sp_gel', 'ie', ['i', 'ih']], ['Die B_ne', 'ie', ['i', 'ih']], ['Das Z_l', 'ie', ['i', 'ih']], ['Das T_r', 'ie', ['i', 'ih']],
+  ['Die Za_l', 'h', ['nichts', 'a']], ['Der Stu_l', 'h', ['nichts', 'u']], ['Die Ba_n', 'h', ['nichts', 'a']], ['wo_nen', 'h', ['nichts', 'o']],
+  ['Die Mu_er', 'tt', ['t', 'dd']], ['Das Schi_', 'ff', ['f', 'v']], ['Der Lö_el', 'ff', ['f', 'v']], ['Das Be_', 'tt', ['t', 'd']],
+  ['Die Brü_e', 'ck', ['k', 'kk']], ['Der Zu_er', 'ck', ['k', 'kk']], ['Die Ja_e', 'ck', ['k', 'kk']], ['Die Ta_e', 'ss', ['ß', 's']],
+];
+
+function spellingQuestion() {
+  if (Math.random() < 0.4) {
+    const [word, a, w] = pick(GAP);
+    return { q: `Was fehlt? ${word}`, a, w: [...w, pick(['h', 'e', 'g', 'z'].filter((x) => x !== a && !w.includes(x)))] };
+  }
+  const [q, list] = SPELL[pick(Object.keys(SPELL))];
+  const [a, w] = pick(list);
+  return { q, a, w };
+}
+
 const DE = [
   { q: 'Welches Wort ist ein Nomen?', a: 'Freude', w: ['freuen', 'fröhlich', 'schnell'] },
   { q: 'Welches Wort ist ein Verb?', a: 'springen', w: ['Sprung', 'sprunghaft', 'Springbrunnen'] },
@@ -236,7 +285,7 @@ const recent = { de: [], en: [], geo: [], ma: [] };
 
 function raw(subject) {
   switch (subject) {
-    case 'de': return pick(DE);
+    case 'de': return Math.random() < 0.45 ? spellingQuestion() : pick(DE);
     case 'en': {
       // Hälfte: Lehrbuch "Here we go" + Halloween, Rest: Grundwortschatz und Grammatik
       const r = Math.random();
@@ -267,4 +316,4 @@ export function nextQuestion(subject) {
   return { q: item.q, options, correct: options.indexOf(item.a) };
 }
 
-export const POOL_SIZES = { de: DE.length, en: EN.length + VOCAB.length + BOOK_VOCAB.length + HALLOWEEN_VOCAB.length, geo: GEO.length + LAENDER.length + EUROPA.length };
+export const POOL_SIZES = { de: DE.length + GAP.length + Object.values(SPELL).reduce((n, [, l]) => n + l.length, 0), en: EN.length + VOCAB.length + BOOK_VOCAB.length + HALLOWEEN_VOCAB.length, geo: GEO.length + LAENDER.length + EUROPA.length };

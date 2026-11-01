@@ -174,6 +174,8 @@ In Schule und Laden: hoch/runter wählen, A bestätigen, B zurück – oder dire
 ## Lernaufgaben ergänzen
 
 Alles in `src/quiz.js`:
+- **Rechtschreibung** (Deutsch, etwa jede zweite Frage): `SPELL` (ie, Dehnungs-h, ss/ß/s, doppelte Mitlaute, ck – richtig
+  und drei falsche Schreibweisen) und `GAP` (Lückenwörter wie „Die Stra_e“).
 - **Deutsch / Englisch / Geographie:** eine Zeile `{ q: 'Frage', a: 'richtig', w: ['falsch', 'falsch', 'falsch'] }`
   in den passenden Pool (`DE`, `EN`, `GEO`) schreiben. Vokabeln in `VOCAB`, Hauptstädte in `LAENDER` / `EUROPA`.
 - **Mathe** wird zufällig erzeugt (`MATH`-Liste): Rechnen, Punkt vor Strich, Klammern, ganze Zahlen, Runden,
