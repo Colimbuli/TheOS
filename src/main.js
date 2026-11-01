@@ -9,7 +9,8 @@ import { sfx, unlockAudio } from './audio.js';
 import { drawTiles, T, TILE, COL, drawDiamond, TALL, tileCutout } from './world.js';
 import Tilt from './tilt.js';
 import Music, { MAP_SONG } from './music.js';
-import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES, createValley, createUnder, VALLEY_SPAWN, createMountain, createLair, MOUNTAIN_SPAWN, LAIR_SPAWN, createDwarf, DWARF_SPAWN, createMaze1, createMaze2, createMaze3, createArena, linkPits, MAZE1_SPAWN, ARENA_SPAWN } from './maps.js';
+import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES, createValley, createUnder, VALLEY_SPAWN, createMountain, createLair, MOUNTAIN_SPAWN, LAIR_SPAWN, createDwarf, DWARF_SPAWN, createMaze1, createMaze2, createMaze3, createArena, linkPits, MAZE1_SPAWN, ARENA_SPAWN, createCliff, createRuehrberg, RUEHRBERG_SPAWN } from './maps.js';
+import { ClimbUI } from './climb.js';
 import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite, guardSprite, bomberSprite, bombSprite, rockSprite, mtrollSprite, rockmonSprite, rockBossSprite, dragonSprite } from './sprites.js';
 import { createNPCs, talkTo, ferdinandDoor, leverDialog, HEROES, questHint, ABILITY_NAME, STARTERS, HOME, THEO_BUSH, theoNPC, allHeroes } from './npcs.js';
 import { Dialog } from './dialog.js';
@@ -47,7 +48,8 @@ const map = () => game.maps[game.mapId];
 function newGame(starter = 'theo') {
   const maps = { village: createVillage(), school: createSchool(), shop: createShop(), cave: createCave(), haunted: createHaunted(),
     valley: createValley(), under: createUnder(), mountain: createMountain(), lair: createLair(), dwarf: createDwarf(),
-    maze1: createMaze1(), maze2: createMaze2(), maze3: createMaze3(), arena: createArena() };
+    maze1: createMaze1(), maze2: createMaze2(), maze3: createMaze3(), arena: createArena(),
+    cliff: createCliff(), ruehrberg: createRuehrberg() };
   linkPits(maps);
   maps.village.npcs = createNPCs(starter);
   if (starter === 'ferdinand') maps.village.setTile(24, 9, T.PATH); // Ferdinand ist schon draußen
@@ -65,6 +67,7 @@ function newGame(starter = 'theo') {
     split: false,
     lab: { gate: false, done: false, taken: [] },
     drg: { won: false, started: false, cooled: 0 },
+    climb: { done: false },
     fissures: [],
     stats: { hearts: 3, maxHearts: 3, level: 1, xp: 0 },
     step: 0, owned: {}, diamonds: 0, ammo: 0, hasCloak: false,
@@ -132,6 +135,9 @@ function applySave(d0) {
   if (d.dw) { Object.assign(game.dw, d.dw); applyDwarf(); }
   if (d.lab) { Object.assign(game.lab, d.lab); applyLab(); }
   if (d.drg) game.drg.won = !!d.drg.won;
+  if (d.climb) game.climb.done = !!d.climb.done;
+  if (game.drg.won) game.maps.village.openEast();
+  if (game.climb.done) game.maps.cliff.rope.hidden = false;
   const cv = game.cave;
   for (const k of cv.dugCells) { const [x, y] = k.split(',').map(Number); c.setTile(x, y, T.CFLOOR); }
   if (cv.boulder) { c.setTile(24, 11, T.CFLOOR); c.setTile(25, 11, T.BOULDER); }
@@ -203,6 +209,7 @@ const fx = {
   openShop() { game.ui = new ShopUI(game, fx); },
   openRiddle(id) { openRiddle(id); },
   jellyTalk() { return jellyTalk(); },
+  startClimb() { startClimb(); },
 };
 
 function float(text, x, y, color = '#f8d848') { game.floats.push({ text, x, y, t: 1.1, color }); }
@@ -277,6 +284,7 @@ function switchLeader() {
 // Kartenwechsel (Türen, Treppen, Tor)
 function goTo(mapId, x, y, dir) {
   endInvisibility(true);
+  moveMama(mapId);
   game.mapId = mapId;
   const L = leader();
   L.x = x; L.y = y; L.dir = dir;
@@ -518,6 +526,7 @@ function fromCode(c) {
     cave: CAVE_SPAWN, haunted: HAUNT_SPAWN, valley: VALLEY_SPAWN, under: { x: 25 * TILE, y: 18 * TILE, dir: 2 },
     mountain: MOUNTAIN_SPAWN, lair: LAIR_SPAWN, dwarf: DWARF_SPAWN,
     maze1: MAZE1_SPAWN, maze2: MAZE1_SPAWN, maze3: MAZE1_SPAWN, arena: ARENA_SPAWN,
+    cliff: { x: 2 * TILE, y: 7 * TILE, dir: 3 }, ruehrberg: RUEHRBERG_SPAWN,
   }[c.mapId];
   const dugCells = [];
   if (c.cave.dug) dugCells.push('15,17');
@@ -531,7 +540,7 @@ function fromCode(c) {
     valley: { ...(c.valley || {}), edits: [], taken: [] },
     mtn: { ...(c.mtn || {}), taken: [] },
     dw: { ...(c.dw || {}), taken: [] },
-    lab: { ...(c.lab || {}), taken: [] }, drg: { ...(c.drg || {}) },
+    lab: { ...(c.lab || {}), taken: [] }, drg: { ...(c.drg || {}) }, climb: { ...(c.climb || {}) },
     starter, rec, mama, hasCloak: c.hasCloak || mama === 2,
     quizIntro: true, seenHints: { felixTalk: true },
   };
@@ -726,6 +735,12 @@ function interact() {
   }
 
   if (m.id === 'dwarf' && dwarfInteract(tx, ty)) return;
+  if (m.id === 'cliff' && m.wall.some(([x, y]) => x === tx && y === ty)) {
+    if (game.climb.done) { goTo('ruehrberg', RUEHRBERG_SPAWN.x, RUEHRBERG_SPAWN.y, RUEHRBERG_SPAWN.dir); sfx.confirm(); return; }
+    if (!m.npcs.some((n) => n.id === 'mama')) { dialog.open(['Ohne Sicherung ist das viel zu gefährlich! Mama kommt bestimmt mit.']); return; }
+    startClimb();
+    return;
+  }
   if (m.id === 'maze3' && m.exitGate[0] === tx && m.exitGate[1] === ty && m.tile(tx, ty) === T.LOCKED) {
     open({ lines: ['Eine glühende Steintür. Darauf steht:', '"Nur wer drei Rätsel hintereinander löst, darf zum Drachen."'], after() { openRiddle('lavadoor'); } });
     return;
@@ -2290,6 +2305,7 @@ function dragonDefeated(e) {
   e.alive = false;
   e.beam = null;
   game.drg.won = true;
+  game.maps.village.openEast();
   const m = map();
   for (const f of game.fissures) m.setTile(f.x, f.y, T.LFLOOR);
   game.fissures = [];
@@ -2306,6 +2322,49 @@ function dragonDefeated(e) {
   save();
 }
 
+// Mama begleitet die Kinder an die Felswand, solange noch niemand oben war
+function moveMama(to) {
+  const v = game.maps.village, c = game.maps.cliff;
+  const inV = v.npcs.findIndex((n) => n.id === 'mama'), inC = c.npcs.findIndex((n) => n.id === 'mama');
+  if (to === 'cliff' && !game.climb.done && inV >= 0) {
+    const mama = v.npcs.splice(inV, 1)[0];
+    Object.assign(mama, { x: 9 * TILE, y: 5 * TILE, dir: 0 });
+    c.npcs.push(mama);
+    if (!game.seenHints.mamaCliff) {
+      game.seenHints.mamaCliff = true;
+      setTimeout(() => dialog.open([
+        'Mama: Halt, wartet! Da klettert ihr nicht ohne Sicherung hoch!',
+        'Mama: Ich komme mit und halte das Seil. Wer vorne läuft, klettert. Sprecht mit mir oder geht an die Wand.',
+      ]), 400);
+    }
+  } else if (to === 'village' && inC >= 0) {
+    const mama = c.npcs.splice(inC, 1)[0];
+    Object.assign(mama, { x: 11 * TILE + 2, y: 9 * TILE, dir: 0 });
+    v.npcs.push(mama);
+  }
+}
+
+function startClimb() {
+  const kid = game.party.find((p) => p.id !== 'jelly');
+  if (!kid) return;
+  const L = leader();
+  const climber = L.id === 'jelly' ? kid.id : L.id;
+  if (L.id === 'jelly') fx.toast('Jelly: Miau! Seile sind nichts für Katzen.', 2);
+  game.ui = new ClimbUI(game, fx, {
+    climber,
+    onTop() {
+      game.climb.done = true;
+      game.maps.cliff.rope.hidden = false;
+      moveMama('village');
+      fx.gainXP(20);
+      goTo('ruehrberg', RUEHRBERG_SPAWN.x, RUEHRBERG_SPAWN.y, RUEHRBERG_SPAWN.dir);
+      fx.banner('RÜHRBERG', 'Das Seil bleibt hängen – jetzt geht es immer schnell hoch', '#a8f070');
+      save();
+    },
+    onQuit() { fx.toast('Abgeseilt. Ihr könnt es jederzeit nochmal versuchen.', 2.5); },
+  });
+}
+
 function homecoming() {
   const S = HEROES[game.starter || 'theo'].name;
   fx.banner('DER BUTTENBERG IST FREI!', 'Willkommen zu Hause in Lindental', '#f8d848');
@@ -2314,6 +2373,7 @@ function homecoming() {
     `${S}: Besiegt! Für immer!`,
     'Wache Konrad: Fünf kleine Helden und eine Katze – das glaubt mir im Dorf keiner!',
     'Mama ruft vom Haus: Kommt rein, es gibt Pfannkuchen! Für ALLE!',
+    'Wache Konrad: Und noch was: Das Geröll im Osten ist weg. Der Weg zur Felswand nach Rührberg ist frei!',
     'ENDE – Danke fürs Spielen! Ihr könnt weiter herumlaufen und Diamanten sammeln.',
   ]);
   save();

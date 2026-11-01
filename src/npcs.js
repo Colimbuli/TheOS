@@ -86,6 +86,8 @@ const LOTTE_TIPS = {
 
 export function questHint(game) {
   if (game.mapId === 'dwarf') return dwarfHint(game);
+  if (game.mapId === 'cliff') return game.climb.done ? 'Ziel: Am Seil hoch nach Rührberg' : 'Quest: Klettert die Felswand hoch (Mama sichert)';
+  if (game.mapId === 'ruehrberg') return 'Rührberg – hier wird noch gebaut';
   if (game.mapId === 'maze1') return 'Quest: Findet den Weg durch den Wald';
   if (game.mapId === 'maze2') return 'Quest: Findet den Weg durch die Höhle';
   if (game.mapId === 'maze3') return game.lab.gate ? 'Ziel: Durch die Tür zum Drachen' : 'Quest: Findet den Ausgang der Lavahöhle';
@@ -94,6 +96,7 @@ export function questHint(game) {
   if (game.mapId === 'valley' || game.mapId === 'under') return valleyHint(game);
   if (game.mapId === 'haunted') return hauntHint(game);
   if (game.mapId === 'cave' || game.step >= 7 && game.mapId !== 'village') return caveHint(game);
+  if (game.drg && game.drg.won) return game.climb.done ? 'Frei! Besucht Rührberg (Osten)' : 'Neu: Der Weg nach Rührberg (Osten)';
   if (game.step >= 7) return 'Ziel: Die Höhle im Buttenberg (Norden)';
   return villageGoal(game);
 }
@@ -188,6 +191,10 @@ export function talkTo(n, game, fx) {
       };
 
     case 'mama': {
+      if (game.mapId === 'cliff') return {
+        lines: [`${M}: Ich halte das Seil gut fest. Wer vorne läuft, klettert. Bereit?`],
+        after() { fx.startClimb(); },
+      };
       const asFried = game.starter === 'friedrich';
       if (game.mama === 2) return { lines: [`${M}: Und denkt an eure Jacken!`] };
       if (game.hasCloak) return {
@@ -249,6 +256,16 @@ export function talkTo(n, game, fx) {
 
     case 'jelly':
       return fx.jellyTalk();
+
+    case 'ruehr_mayor':
+      return { lines: [
+        'Bürgermeisterin Kneter: Kinder aus Lindental?! Ihr seid die Wand hochgeklettert? Respekt!',
+        'Bürgermeisterin Kneter: Willkommen in Rührberg. Wir bauen hier gerade noch alles auf ...',
+        'Bürgermeisterin Kneter: Kommt bald wieder – dann gibt es hier ein neues Abenteuer!',
+      ] };
+
+    case 'ruehr_kid':
+      return { lines: ['Junge: Ihr habt den Drachen besiegt? Echt jetzt?! Erzählt mal!'] };
 
     case 'lino':
       return { lines: [

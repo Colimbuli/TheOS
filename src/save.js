@@ -13,7 +13,7 @@ export function snapshot(game) {
     mapId: game.mapId, x: L.x, y: L.y, dir: L.dir,
     party: game.party.map((m) => m.id),
     stats: game.stats, step: game.step, owned: game.owned,
-    quizWrong: game.quizWrong, starter: game.starter, rec: game.rec, dw: game.dw, lab: game.lab, drg: { won: game.drg.won }, mama: game.mama, theoFound: game.theoFound, mtn: game.mtn,
+    quizWrong: game.quizWrong, starter: game.starter, rec: game.rec, dw: game.dw, lab: game.lab, drg: { won: game.drg.won }, climb: game.climb, mama: game.mama, theoFound: game.theoFound, mtn: game.mtn,
     diamonds: game.diamonds, ammo: game.ammo, hasCloak: game.hasCloak,
     cave: game.cave, haunt: game.haunt, valley: game.valley, quizStats: game.quizStats, quizIntro: game.quizIntro,
     seenHints: game.seenHints, checkpoint: game.checkpoint,
@@ -47,7 +47,7 @@ const OWN = ['shield', 'strength', 'dig', 'invis', 'sling', 'shovel', 'shield2',
 const VALLEY = ['sword', 'key', 'lever', 'door', 'troll', 'done'];
 const CAVE = ['dug', 'boulder', 'key', 'door', 'statue', 'troll', 'lever', 'secret', 'done'];
 const HAUNT = ['gate', 'front', 'count', 'chest', 'lib', 'candles', 'king', 'door6', 'done'];
-const MAPS = ['village', 'cave', 'haunted', 'valley', 'under', 'mountain', 'lair', 'dwarf', 'maze1', 'maze2', 'maze3', 'arena'];
+const MAPS = ['village', 'cave', 'haunted', 'valley', 'under', 'mountain', 'lair', 'dwarf', 'maze1', 'maze2', 'maze3', 'arena', 'cliff', 'ruehrberg'];
 const LATE = ['gate', 'done', 'won'];
 const DW = ['theo', 'felix', 'ferd', 'fried', 'lino', 'jelly', 'plates', 'lock', 'done'];
 const STARTERS = ['theo', 'felix', 'ferdinand', 'friedrich', 'lino'];
@@ -62,6 +62,7 @@ function fields(v = 3) {
   // immer 0, deshalb bleiben alte Codes gültig (Startfigur Theo, Kapitel 5 nicht begonnen).
   return [
     ...(v === 3 ? [
+      [1, (s) => (s.climb && s.climb.done ? 1 : 0)],
       [2, (s) => mapIndex(s) >> 3],
       [3, (s) => flags(LATE, { gate: s.lab && s.lab.gate, done: s.lab && s.lab.done, won: s.drg && s.drg.won })],
       [9, (s) => flags(DW, s.dw)],
@@ -133,8 +134,8 @@ export function decodeCode(code) {
   for (let i = f.length - 1; i >= 0; i--) { const bits = f[i][0]; vals.unshift(Number(n & BigInt((1 << bits) - 1))); n >>= BigInt(bits); }
   if (n !== 0n) return null; // ungenutzte Bits müssen 0 sein (fängt Tippfehler am Anfang ab)
   if (v === 1) { vals.splice(11, 0, 0); vals.unshift(0, 0, 0, 0); } // alte Codes: kein Tal-Fortschritt
-  if (v !== 3) vals.unshift(0, 0, 0);
-  const [mapExt, late, dw, starter, rec, mama, mtn, step, cloak, own, hearts, diamonds, ammo, level, xp, cave, haunt, target, valley, map] = vals;
+  if (v !== 3) vals.unshift(0, 0, 0, 0);
+  const [climb, mapExt, late, dw, starter, rec, mama, mtn, step, cloak, own, hearts, diamonds, ammo, level, xp, cave, haunt, target, valley, map] = vals;
   const unpack = (names, v) => Object.fromEntries(names.map((nm, i) => [nm, !!(v >> i & 1)]));
   const owned = Object.fromEntries(OWN.filter((_, i) => own >> i & 1).map((k) => [k, true]));
   if (hearts) owned.heart = hearts;
@@ -142,7 +143,7 @@ export function decodeCode(code) {
     step, hasCloak: !!cloak, owned, diamonds, ammo, level: Math.max(1, level), xp,
     cave: unpack(CAVE, cave), haunt: { ...unpack(HAUNT, haunt), target: Math.max(5, target) }, valley: unpack(VALLEY, valley),
     starter: STARTERS[starter], rec: unpack(STARTERS, rec), mama: mama ? 2 : 0, mtn: unpack(MTN, mtn), dw: unpack(DW, dw),
-    lab: { gate: !!(late & 1), done: !!(late & 2) }, drg: { won: !!(late & 4) },
+    lab: { gate: !!(late & 1), done: !!(late & 2) }, drg: { won: !!(late & 4) }, climb: { done: !!climb },
     mapId: MAPS[(mapExt << 3) | map] || 'village',
   };
 }

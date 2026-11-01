@@ -106,6 +106,14 @@ export function createVillage() {
   map.gateOpen = false;
   map.openGate = () => { map.gateOpen = true; map.northExit = true; map.lever.pulled = true; b.rect(15, 1, 2, 1, T.PATH); };
   map.isLever = (tx, ty) => tx === 18 && ty === 2;
+
+  // Weg nach Osten (Rührberg) – bis zum Sieg über den Drachen verschüttet
+  b.rect(29, 12, 3, 2, T.PATH);
+  b.set(27, 13, T.PATH);
+  map.eastRubble = [[29, 12], [29, 13], [30, 12], [30, 13]];
+  for (const [x, y] of map.eastRubble) { b.set(x, y, T.ROCK); b.say(x, y, ['Geröll! Seit der Drache am Buttenberg tobt, ist der Weg nach Osten verschüttet.']); }
+  map.openEast = () => { for (const [x, y] of map.eastRubble) { map.setTile(x, y, T.PATH); map.texts.delete(`${x},${y}`); } };
+  for (const y of [12, 13]) map.warps.push({ x: 31, y, to: 'cliff', tx: 1 * TILE, ty: 7 * TILE, dir: 3 });
   return map;
 }
 
@@ -995,4 +1003,64 @@ function drawRuneStone(g, o, cx, cy, t) {
   g.fillStyle = '#6a6478'; g.fillRect(X + 4, Y - 3, 8, 15);
   const glow = Math.floor(t * 4) % 2 ? '#88f0ff' : '#58c8ff';
   g.fillStyle = glow; g.fillRect(X + 7, Y - 1, 2, 10); g.fillRect(X + 5, Y + 2, 6, 1); g.fillRect(X + 5, Y + 6, 6, 1);
+}
+
+// --- Weg nach Rührberg: Felswand am Ostrand von Lindental -----------------------------------
+
+export function createCliff() {
+  const { map, b } = makeMap({ id: 'cliff', w: 20, h: 13, fill: T.GRASS, edge: T.TREE, theme: 'valley' });
+  b.rect(0, 0, 20, 1, T.TREE); b.rect(0, 12, 20, 1, T.TREE); b.rect(19, 0, 1, 13, T.TREE);
+  b.rect(0, 0, 1, 13, T.TREE);
+  b.rect(1, 1, 18, 4, T.CLIFF);                          // Felswand
+  b.rect(0, 7, 11, 2, T.PATH); b.rect(10, 5, 2, 4, T.PATH);
+  for (const [x, y] of [[3, 10], [15, 9], [17, 6], [5, 5]]) b.set(x, y, T.BUSH);
+  for (const [x, y] of [[14, 6], [7, 10], [16, 10]]) b.set(x, y, T.ROCK);
+  const r = rng(91);
+  for (let i = 0; i < 18; i++) { const x = 1 + ((r() * 17) | 0), y = 5 + ((r() * 6) | 0); if (map.tile(x, y) === T.GRASS) b.set(x, y, T.FLOWER); }
+  map.wall = [[10, 4], [11, 4]];
+  map.rope = addObj(b, { type: 'rope', x: 10, y: 1, h: 4, hidden: true }, drawRope, 5 * TILE);
+  addObj(b, { type: 'sign', x: 13, y: 5 }, drawSign, 6 * TILE); b.solid(13, 5);
+  b.say(13, 5, ['OBEN: Rührberg', 'Kletterwand – nur mit Sicherung!']);
+  for (const y of [7, 8]) map.warps.push({ x: 0, y, to: 'village', tx: 29 * TILE, ty: 12 * TILE + 8, dir: 2 });
+  map.hints = [[1, 5, 18, 11, 'Die Felswand nach Rührberg. Oben liegt das Nachbardorf!']];
+  map.checkpoints = [];
+  return map;
+}
+
+function drawRope(g, o, cx, cy) {
+  if (o.hidden) return;
+  const X = o.x * TILE - cx + 16, Y = o.y * TILE - cy;
+  g.fillStyle = '#8a6a3a'; g.fillRect(X - 1, Y, 3, o.h * TILE);
+  g.fillStyle = '#d8b878'; g.fillRect(X - 1, Y, 1, o.h * TILE);
+  for (let i = 0; i < o.h * 2; i++) { g.fillStyle = '#6a4a20'; g.fillRect(X - 2, Y + 4 + i * 8, 5, 2); }
+}
+
+export const RUEHRBERG_SPAWN = { x: 11 * TILE + 8, y: 13 * TILE, dir: 1 };
+
+export function createRuehrberg() {
+  const { map, b } = makeMap({ id: 'ruehrberg', w: 24, h: 16, fill: T.GRASS, edge: T.TREE, theme: 'village' });
+  b.rect(0, 0, 24, 2, T.TREE); b.rect(0, 0, 2, 16, T.TREE); b.rect(22, 0, 2, 16, T.TREE);
+  b.rect(2, 15, 20, 1, T.CLIFF);                                   // Klippenrand
+  b.rect(11, 15, 2, 1, T.PATH);                                    // dort hängt das Seil
+  b.rect(11, 9, 2, 6, T.PATH); b.rect(4, 9, 16, 2, T.PATH);
+  const r = rng(13);
+  for (let i = 0; i < 30; i++) { const x = 2 + ((r() * 20) | 0), y = 2 + ((r() * 12) | 0); if (map.tile(x, y) === T.GRASS) b.set(x, y, T.FLOWER); }
+  const house = (x, y, w, h, roof) => { addObj(b, { type: 'house', x, y, w, h, roof, door: { x: x + 2, y: y + h - 1 } }, drawHouse); b.solid(x, y, w, h); };
+  house(3, 4, 5, 4, ROOFS.orange);
+  house(15, 4, 5, 4, ROOFS.blue);
+  // Baustelle in der Mitte
+  b.rect(9, 3, 6, 4, T.PATH);
+  for (const [x, y] of [[9, 3], [14, 3], [9, 6], [14, 6]]) b.set(x, y, T.FENCE);
+  addObj(b, { type: 'barrel', x: 10, y: 4 }, drawBarrel); b.solid(10, 4);
+  addObj(b, { type: 'barrel', x: 13, y: 5 }, drawBarrel); b.solid(13, 5);
+  addObj(b, { type: 'sign', x: 12, y: 7 }, drawSign, 8 * TILE); b.solid(12, 7);
+  b.say(12, 7, ['RÜHRBERG', 'Achtung, Baustelle! Hier entsteht bald ein neues Abenteuer.']);
+  map.npcs.push({ id: 'ruehr_mayor', pal: 'teacher', x: 7 * TILE, y: 10 * TILE, dir: 0, anim: 0, moving: false });
+  map.npcs.push({ id: 'ruehr_kid', pal: 'merchant', x: 16 * TILE, y: 11 * TILE, dir: 2, anim: 0, moving: false });
+  map.rope = addObj(b, { type: 'rope', x: 11, y: 14, h: 2, hidden: false }, drawRope, 16 * TILE);
+  // Am Seil zurück nach unten
+  map.warps.push({ x: 11, y: 15, to: 'cliff', tx: 10 * TILE + 8, ty: 5 * TILE, dir: 0 }, { x: 12, y: 15, to: 'cliff', tx: 10 * TILE + 8, ty: 5 * TILE, dir: 0 });
+  map.hints = [[2, 2, 21, 14, 'Willkommen in Rührberg! Das Dorf wird gerade noch gebaut ...']];
+  map.checkpoints = [];
+  return map;
 }

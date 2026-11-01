@@ -126,6 +126,11 @@ Wer erschöpft ist, startet wieder am Eingang von Labyrinth 1.
 
 Wer im Kampf erschöpft ist, beginnt den Kampf neu. Nach dem Sieg geht es heim nach Lindental.
 
+**Rührberg (in Arbeit):** Nach dem Sieg über den Drachen ist das Geröll am Ostrand von Lindental weg. Der Pfad führt
+zu einer Felswand, Mama kommt mit und sichert am Seil. Das vorderste Kind klettert (Vorderansicht):
+oben steht eine Frage, drei Griffe sind die Antworten – 6 Sekunden Zeit. Falsch oder zu langsam heißt eine
+Stufe zurück, nach 10 Stufen ist man oben. Danach hängt dort ein Seil. Das Nachbardorf Rührberg ist noch eine Baustelle.
+
 Der Spielstand wird automatisch im Browser gespeichert („Weiterspielen“ im Titelbild).
 Im Spiel öffnet **Esc / P** (Gamepad: Start, Touch: ☰) das Menü: 3 Speicherplätze und ein **Speichercode**
 zum Abschreiben (auch als Link: `?code=XXXX-XXXX-XXXX-XXXX-XXXX-XXXX`). Über **Kapitel wählen** im Titelbild
@@ -225,6 +230,7 @@ src/npcs.js       Figuren, Dialoge, Quest-Schritte und Hinweise
 src/quiz.js       Lernaufgaben der Schule (Fragenpools + Mathe-Generator)
 src/halloween.js  Halloween-, Lehrbuch-, Binär- und Divisionsaufgaben
 src/mountain.js   Lernaufgaben Kapitel 5 (Berge, Höhen, Deutsch)
+src/climb.js      Kletterwand nach Rührberg (Fragen an den Griffen)
 src/shop.js       Ladenangebot und Kauf
 src/ui.js         Menüs: Schule, Laden, Rätseltüren, Pause/Speichern, Kapitel- und Figurenwahl
 src/save.js       Spielstände (localStorage, 3 Plätze) und Speichercode
