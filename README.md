@@ -126,6 +126,13 @@ Wer erschöpft ist, startet wieder am Eingang von Labyrinth 1.
 
 Wer im Kampf erschöpft ist, beginnt den Kampf neu. Nach dem Sieg geht es heim nach Lindental.
 
+**9 – Kleinfeld** (nach Theos Karte): Nach dem Drachen liegt im Dorfbrunnen ein Schlüssel – Ferdinands
+Hausschlüssel. Aus seinem Keller führt ein Tunnel in einen Keller voller Kisten (Felix schiebt; ein Hebel stellt
+sie zurück), die Treppe dahinter in den Laden von Kleinfeld. Die Verkäuferin gibt den Schlüssel zum
+Hinterzimmer, wer 3 Fragen in Folge richtig beantwortet; beim anderen Verkäufer kann man einkaufen.
+Draußen wartet Papa und erzählt vom Monster. Ferdinand gräbt durch die Erdmauer zum Hebel, der öffnet die
+Mauer zum Schlüsselraum, der Schlüssel öffnet die Tür zum Ausgang. Dahinter: Fortsetzung folgt (Endboss).
+
 **Rührberg (in Arbeit):** Nach dem Sieg über den Drachen ist das Geröll am Ostrand von Lindental weg. Der Pfad führt
 zu einer Felswand, Mama kommt mit und sichert am Seil. Das vorderste Kind klettert (Vorderansicht):
 oben steht eine Frage, drei Griffe sind die Antworten – 6 Sekunden Zeit. Falsch oder zu langsam heißt eine
@@ -133,7 +140,7 @@ Stufe zurück, nach 10 Stufen ist man oben. Danach hängt dort ein Seil. Das Nac
 
 Der Spielstand wird automatisch im Browser gespeichert („Weiterspielen“ im Titelbild).
 Im Spiel öffnet **Esc / P** (Gamepad: Start, Touch: ☰) das Menü: 3 Speicherplätze und ein **Speichercode**
-zum Abschreiben (auch als Link: `?code=XXXX-XXXX-XXXX-XXXX-XXXX-XXXX`). Über **Kapitel wählen** im Titelbild
+zum Abschreiben (auch als Link: `?code=XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX`). Über **Kapitel wählen** im Titelbild
 startet man jedes Kapitel direkt – mit allen Fähigkeiten, die man bis dahin hätte. Ältere Speichercodes
 bleiben gültig (Startfigur ist dann Theo).
 

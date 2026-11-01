@@ -5,7 +5,7 @@ import {
   drawHouse, drawFountain, drawStall, drawLever, drawSign, drawHouseSign, drawTorch, drawStatue,
   drawBlackboard, drawDesk, drawShelf, drawCounter, drawBarrel, drawPlant, drawWindow,
   drawPumpkin, drawGrave, drawCandle, drawWallBat, drawWallSpider, drawCauldron, drawDeadTree,
-  drawChest, drawSearchlight, drawSpitter, drawBrazier, drawCage, drawWheel, drawArrowSlot, drawRuneGate,
+  drawChest, drawSearchlight, drawSpitter, drawBrazier, drawCage, drawWheel, drawArrowSlot, drawRuneGate, drawParking, drawWallBlock, drawShopSign,
 } from './world.js';
 
 function addObj(b, o, draw, sortY) {
@@ -1062,5 +1062,138 @@ export function createRuehrberg() {
   map.warps.push({ x: 11, y: 15, to: 'cliff', tx: 10 * TILE + 8, ty: 5 * TILE, dir: 0 }, { x: 12, y: 15, to: 'cliff', tx: 10 * TILE + 8, ty: 5 * TILE, dir: 0 });
   map.hints = [[2, 2, 21, 14, 'Willkommen in Rührberg! Das Dorf wird gerade noch gebaut ...']];
   map.checkpoints = [];
+  return map;
+}
+
+// --- Kapitel 9: Kleinfeld (nach Theos Karte) ---------------------------------------------------
+//
+// Schlüssel im Dorfbrunnen → Ferdinands Haus → Keller-Tunnel → Kisten (Felix) → Treppe in den Laden
+// von Kleinfeld → Papa erzählt vom Monster → Erdmauer (Ferdinand) → Hebel öffnet die Mauer →
+// Schlüsselraum → verschlossener Ausgang (Fortsetzung folgt). Lernaufgabe beim Verkäufer: Hinterzimmer.
+
+export function createFHouse() {
+  const { map, b } = interior('fhouse', 24);
+  map.warps[0].ty = 8 * TILE;
+  addObj(b, { type: 'shelf', x: 1, y: 1, w: 3 }, drawShelf, 0);
+  addObj(b, { type: 'window', x: 6, y: 0 }, drawWindow, 0);
+  addObj(b, { type: 'window', x: 9, y: 0 }, drawWindow, 0);
+  addObj(b, { type: 'desk', x: 5, y: 4, w: 3, book: true }, drawDesk); b.solid(5, 4, 3, 1);
+  addObj(b, { type: 'plant', x: 1, y: 7 }, drawPlant); b.solid(1, 7);
+  addObj(b, { type: 'barrel', x: 13, y: 7 }, drawBarrel); b.solid(13, 7);
+  b.rect(5, 6, 4, 2, T.RUG);
+  b.set(12, 2, T.DOWN);
+  map.warps.push({ x: 12, y: 2, to: 'kcellar', tx: 2 * TILE, ty: 3 * TILE - 4, dir: 3 });
+  map.hints = [[1, 2, 13, 8, 'Ferdinands Haus. Hinten führt eine Treppe in den Keller ...']];
+  map.checkpoints = [];
+  return map;
+}
+
+export function createKCellar() {
+  const { map, b } = makeMap({ id: 'kcellar', w: 11, h: 8, fill: T.WOOD, edge: T.IWALL, theme: 'inside' });
+  b.rect(0, 0, 11, 1, T.IWALL); b.rect(0, 7, 11, 1, T.IWALL); b.rect(0, 0, 1, 8, T.IWALL); b.rect(10, 0, 1, 8, T.IWALL);
+  b.set(1, 3, T.PIT);                                        // Tunnel zurück nach Lindental
+  map.warps.push({ x: 1, y: 3, to: 'fhouse', tx: 12 * TILE, ty: 3 * TILE, dir: 0 });
+  b.set(9, 6, T.UP);                                         // Treppe hoch in den Laden
+  map.warps.push({ x: 9, y: 6, to: 'kshop', tx: 13 * TILE, ty: 9 * TILE - 4, dir: 1 });
+  map.crates = [[7, 4], [7, 5], [7, 6], [2, 1], [4, 1], [6, 1], [8, 2], [3, 6]];
+  for (const [x, y] of map.crates) { b.under(x, y, T.WOOD); b.set(x, y, T.BOULDER); }
+  map.reset = addObj(b, { type: 'lever', x: 1, y: 6, pulled: false }, drawLever); b.solid(1, 6);
+  map.hints = [[1, 1, 9, 6, 'Ein Keller voller Kisten. Dahinter ist eine Treppe! Felix kann Kisten schieben. Der Hebel stellt alles zurück.']];
+  map.checkpoints = [];
+  return map;
+}
+
+export function createKShop() {
+  const { map, b } = makeMap({ id: 'kshop', w: 16, h: 12, fill: T.WOOD, edge: T.IWALL, theme: 'inside' });
+  b.rect(0, 0, 16, 1, T.IWALL); b.rect(0, 11, 16, 1, T.IWALL); b.rect(0, 0, 1, 12, T.IWALL); b.rect(15, 0, 1, 12, T.IWALL);
+  b.rect(1, 3, 14, 1, T.IWALL);                              // Wand zum Hinterzimmer
+  b.set(12, 3, T.LOCKED);                                    // Hinterzimmertür
+  map.backDoor = [12, 3];
+  b.set(2, 11, T.EXIT);
+  map.warps.push({ x: 2, y: 11, to: 'kleinfeld', tx: 4 * TILE, ty: 7 * TILE, dir: 0 });
+  b.set(14, 10, T.DOWN);                                     // Treppe in den Keller
+  map.warps.push({ x: 14, y: 10, to: 'kcellar', tx: 8 * TILE, ty: 6 * TILE - 4, dir: 2 });
+  addObj(b, { type: 'counter', x: 4, y: 6, w: 7, wares: true }, drawCounter);
+  b.solid(4, 6, 7, 1);
+  for (let x = 4; x < 11; x++) b.counter(x, 6);
+  addObj(b, { type: 'shelf', x: 1, y: 4, w: 2, goods: true }, drawShelf, 5 * TILE);
+  addObj(b, { type: 'shelf', x: 12, y: 4, w: 3, goods: true }, drawShelf, 5 * TILE);
+  b.solid(1, 4, 2, 1); b.solid(12, 4, 3, 1);
+  for (const [x, y] of [[1, 9], [13, 7]]) { addObj(b, { type: 'barrel', x, y }, drawBarrel); b.solid(x, y); }
+  b.rect(6, 8, 3, 2, T.RUG);
+  map.npcs.push({ id: 'kseller1', pal: 'merchant', x: 5 * TILE, y: 5 * TILE - 4, dir: 0, anim: 0, moving: false });
+  map.npcs.push({ id: 'kseller2', pal: 'bruno', x: 9 * TILE, y: 5 * TILE - 4, dir: 0, anim: 0, moving: false });
+  const item = (type, x, y, id) => map.items.push({ id, type, x: x * TILE + 2, y: y * TILE + 2, taken: false });
+  [[2, 1], [4, 1], [6, 2], [9, 1], [11, 2], [13, 1]].forEach(([x, y], i) => item('crystal', x, y, `kb${i}`));
+  item('apple', 3, 2, 'kb6'); item('bag', 8, 1, 'kb7');
+  map.hints = [[1, 4, 14, 10, 'Ein Laden in Kleinfeld! Die Treppe kam direkt aus Ferdinands Keller.']];
+  map.checkpoints = [];
+  return map;
+}
+
+export const KLEIN_SPAWN = { x: 4 * TILE, y: 7 * TILE, dir: 0 };
+
+export function createKleinfeld() {
+  const { map, b } = makeMap({ id: 'kleinfeld', w: 30, h: 26, fill: T.GRASS, edge: T.TREE, theme: 'village' });
+  b.rect(0, 0, 30, 1, T.TREE); b.rect(0, 25, 30, 1, T.TREE); b.rect(0, 0, 1, 26, T.TREE); b.rect(29, 0, 1, 26, T.TREE);
+  const r = rng(29);
+  for (let i = 0; i < 40; i++) { const x = 1 + ((r() * 28) | 0), y = 1 + ((r() * 24) | 0); b.set(x, y, T.FLOWER); }
+  const wall = (x, y, w, h) => b.rect(x, y, w, h, T.CWALL);
+
+  // Laden mit großem Schild
+  addObj(b, { type: 'house', x: 3, y: 1, w: 11, h: 6, roof: ROOFS.red, door: { x: 4, y: 6 } }, drawHouse);
+  b.solid(3, 1, 11, 6); b.free(4, 6);
+  map.warps.push({ x: 4, y: 6, to: 'kshop', tx: 2 * TILE, ty: 10 * TILE - 4, dir: 1 });
+  addObj(b, { type: 'shopsign', x: 1, y: 2 }, drawShopSign, 6 * TILE); b.solid(1, 2, 1, 4);
+  b.rect(4, 7, 1, 2, T.PATH);
+
+  // Parkplatz
+  b.rect(2, 9, 14, 9, T.CFLOOR);
+  addObj(b, { type: 'parking', x: 3, y: 9, w: 12, h: 2 }, drawParking, 0);
+  addObj(b, { type: 'parking', x: 3, y: 15, w: 12, h: 2 }, drawParking, 0);
+  b.rect(2, 18, 14, 1, T.PATH);
+
+  // Hof mit Gebäude (rechts)
+  wall(17, 8, 12, 1); wall(17, 21, 12, 1); wall(17, 8, 1, 14); wall(28, 8, 1, 14);
+  b.rect(18, 9, 10, 12, T.PATH);
+  addObj(b, { type: 'house', x: 20, y: 11, w: 6, h: 7, roof: ROOFS.blue, door: { x: 99, y: 99 } }, drawHouse);
+  b.solid(20, 11, 6, 7);
+  b.set(17, 18, T.PATH);                                     // Hofeingang
+  // Hebelraum oben, hinter der Erdmauer
+  wall(19, 2, 7, 1); wall(19, 2, 1, 7); wall(25, 2, 1, 7);
+  b.rect(20, 3, 5, 5, T.CFLOOR);
+  b.set(22, 8, T.EWALL);
+  map.lever = addObj(b, { type: 'lever', x: 22, y: 4, pulled: false }, drawLever); b.solid(22, 4);
+  map.isLever = (tx, ty) => tx === 22 && ty === 4;
+
+  // Schlüsselraum unten links hinter der Mauer
+  wall(1, 19, 10, 1); wall(10, 19, 1, 6);
+  b.rect(1, 20, 9, 4, T.CFLOOR);
+  map.gate = addObj(b, { type: 'wallblock', x: 3, y: 19, w: 1 }, drawWallBlock, 20 * TILE);
+  b.set(3, 19, T.CFLOOR); b.solid(3, 19);
+  map.openGate = () => { map.gate.hidden = true; map.block[19][3] = false; };
+  const item = (type, x, y, id) => map.items.push({ id, type, x: x * TILE + 2, y: y * TILE + 2, taken: false });
+  item('key', 5, 22, 'kkey');
+  [[2, 21], [4, 23], [6, 21], [8, 22], [2, 23], [8, 20]].forEach(([x, y], i) => item('crystal', x, y, `kd${i}`));
+
+  // Ausgang (verschlossen) mit Treppe
+  wall(12, 20, 7, 1); wall(12, 20, 1, 5); wall(18, 20, 1, 5);
+  b.rect(13, 21, 5, 3, T.CFLOOR);
+  b.set(15, 20, T.LOCKED);
+  map.exitDoor = [15, 20];
+  b.set(16, 22, T.DOWN);
+  b.rect(11, 19, 7, 1, T.PATH);
+
+  for (const [x, y] of [[16, 3], [27, 3], [27, 23], [22, 23], [1, 8], [16, 7]]) b.set(x, y, T.TREE);
+  for (const [x, y] of [[18, 3], [26, 6], [15, 2], [20, 23]]) b.set(x, y, T.BUSH);
+  map.enemySpawns = [{ type: 'mtroll', x: 19, y: 10 }, { type: 'mtroll', x: 26, y: 19 }, { type: 'bat', x: 9, y: 13 }, { type: 'slime', x: 22, y: 9 }];
+  map.npcs.push({ id: 'papa', pal: 'papa', x: 7 * TILE, y: 8 * TILE, dir: 2, anim: 0, moving: false });
+  map.hints = [
+    [17, 9, 28, 20, 'Ein Hof um ein großes Gebäude. Oben ist eine Erdmauer – ein Fall für Ferdinand.'],
+    [20, 3, 24, 7, 'Ein Hebel! Er öffnet bestimmt die Mauer unten links.'],
+    [1, 20, 9, 23, 'Der Schlüsselraum!'],
+    [11, 19, 17, 19, 'Eine verschlossene Tür. Dahinter führt eine Treppe weiter ...'],
+  ];
+  map.checkpoints = [[2, 7, 16, 18, KLEIN_SPAWN.x, KLEIN_SPAWN.y, 0]];
   return map;
 }

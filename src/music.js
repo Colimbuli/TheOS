@@ -101,7 +101,7 @@ export const SONGS = {
 };
 
 // Welches Stück wo läuft
-export const MAP_SONG = { village: 'village', school: 'inside', shop: 'inside', cave: 'cave', under: 'cave', lair: 'cave', haunted: 'haunted', valley: 'valley', mountain: 'mountain', dwarf: 'dwarf', maze1: 'valley', maze2: 'cave', maze3: 'lava', cliff: 'village', ruehrberg: 'village' };
+export const MAP_SONG = { village: 'village', school: 'inside', shop: 'inside', cave: 'cave', under: 'cave', lair: 'cave', haunted: 'haunted', valley: 'valley', mountain: 'mountain', dwarf: 'dwarf', maze1: 'valley', maze2: 'cave', maze3: 'lava', cliff: 'village', ruehrberg: 'village', fhouse: 'inside', kcellar: 'cave', kshop: 'inside', kleinfeld: 'valley' };
 
 // --- Stück in Noten-Ereignisse übersetzen (Raster: Sechzehntel) ---------------------------
 

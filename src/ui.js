@@ -317,7 +317,7 @@ export class RiddleUI {
 // --- Pause-Menü: Speichern, Laden, Speichercode ------------------------------------
 
 const MAP_NAMES = { village: 'Lindental', school: 'Schule', shop: 'Brunos Laden', cave: 'Höhle', haunted: 'Spukhaus',
-  valley: 'Tal der Trolle', under: 'Unterwelt', mountain: 'Bergpfad', lair: 'Felsmonster-Höhle', dwarf: 'Zwergenhallen', maze1: 'Waldlabyrinth', maze2: 'Höhlenlabyrinth', maze3: 'Lavalabyrinth', arena: 'Drachenhort', cliff: 'Felswand', ruehrberg: 'Rührberg' };
+  valley: 'Tal der Trolle', under: 'Unterwelt', mountain: 'Bergpfad', lair: 'Felsmonster-Höhle', dwarf: 'Zwergenhallen', maze1: 'Waldlabyrinth', maze2: 'Höhlenlabyrinth', maze3: 'Lavalabyrinth', arena: 'Drachenhort', cliff: 'Felswand', ruehrberg: 'Rührberg', fhouse: 'Ferdinands Haus', kcellar: 'Keller', kshop: 'Laden in Kleinfeld', kleinfeld: 'Kleinfeld' };
 
 function slotLabel(d) {
   if (!d) return { name: '– leer –', info: '' };

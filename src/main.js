@@ -9,7 +9,7 @@ import { sfx, unlockAudio } from './audio.js';
 import { drawTiles, T, TILE, COL, drawDiamond, TALL, tileCutout } from './world.js';
 import Tilt from './tilt.js';
 import Music, { MAP_SONG } from './music.js';
-import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES, createValley, createUnder, VALLEY_SPAWN, createMountain, createLair, MOUNTAIN_SPAWN, LAIR_SPAWN, createDwarf, DWARF_SPAWN, createMaze1, createMaze2, createMaze3, createArena, linkPits, MAZE1_SPAWN, ARENA_SPAWN, createCliff, createRuehrberg, RUEHRBERG_SPAWN } from './maps.js';
+import { createVillage, createSchool, createShop, createCave, CAVE_SPAWN, createHaunted, HAUNT_SPAWN, CANDLE_VALUES, createValley, createUnder, VALLEY_SPAWN, createMountain, createLair, MOUNTAIN_SPAWN, LAIR_SPAWN, createDwarf, DWARF_SPAWN, createMaze1, createMaze2, createMaze3, createArena, linkPits, MAZE1_SPAWN, ARENA_SPAWN, createCliff, createRuehrberg, RUEHRBERG_SPAWN, createFHouse, createKCellar, createKShop, createKleinfeld, KLEIN_SPAWN } from './maps.js';
 import { ClimbUI } from './climb.js';
 import { charSprite, heartSprite, itemSprite, slimeSprite, koboldSprite, trollSprite, fireSprite, ghostSprite, witchSprite, grafSprite, batSprite, guardSprite, bomberSprite, bombSprite, rockSprite, mtrollSprite, rockmonSprite, rockBossSprite, dragonSprite } from './sprites.js';
 import { createNPCs, talkTo, ferdinandDoor, leverDialog, HEROES, questHint, ABILITY_NAME, STARTERS, HOME, THEO_BUSH, theoNPC, allHeroes } from './npcs.js';
@@ -49,7 +49,8 @@ function newGame(starter = 'theo') {
   const maps = { village: createVillage(), school: createSchool(), shop: createShop(), cave: createCave(), haunted: createHaunted(),
     valley: createValley(), under: createUnder(), mountain: createMountain(), lair: createLair(), dwarf: createDwarf(),
     maze1: createMaze1(), maze2: createMaze2(), maze3: createMaze3(), arena: createArena(),
-    cliff: createCliff(), ruehrberg: createRuehrberg() };
+    cliff: createCliff(), ruehrberg: createRuehrberg(),
+    fhouse: createFHouse(), kcellar: createKCellar(), kshop: createKShop(), kleinfeld: createKleinfeld() };
   linkPits(maps);
   maps.village.npcs = createNPCs(starter);
   if (starter === 'ferdinand') maps.village.setTile(24, 9, T.PATH); // Ferdinand ist schon draußen
@@ -68,6 +69,7 @@ function newGame(starter = 'theo') {
     lab: { gate: false, done: false, taken: [] },
     drg: { won: false, started: false, cooled: 0 },
     climb: { done: false },
+    k9: { stage: 0, back: false, taken: [] },
     fissures: [],
     stats: { hearts: 3, maxHearts: 3, level: 1, xp: 0 },
     step: 0, owned: {}, diamonds: 0, ammo: 0, hasCloak: false,
@@ -92,7 +94,7 @@ function newGame(starter = 'theo') {
   spawnEnemies(maps.mountain);
   spawnEnemies(maps.lair);
   spawnEnemies(maps.dwarf);
-  for (const k of ['maze1', 'maze2', 'maze3', 'arena']) spawnEnemies(maps[k]);
+  for (const k of ['maze1', 'maze2', 'maze3', 'arena', 'kleinfeld']) spawnEnemies(maps[k]);
 }
 
 // Gespeicherten Stand auf frisch aufgebaute Karten anwenden
@@ -138,6 +140,7 @@ function applySave(d0) {
   if (d.climb) game.climb.done = !!d.climb.done;
   if (game.drg.won) game.maps.village.openEast();
   if (game.climb.done) game.maps.cliff.rope.hidden = false;
+  if (d.k9) { Object.assign(game.k9, d.k9); applyK9(); }
   const cv = game.cave;
   for (const k of cv.dugCells) { const [x, y] = k.split(',').map(Number); c.setTile(x, y, T.CFLOOR); }
   if (cv.boulder) { c.setTile(24, 11, T.CFLOOR); c.setTile(25, 11, T.BOULDER); }
@@ -209,6 +212,7 @@ const fx = {
   openShop() { game.ui = new ShopUI(game, fx); },
   openRiddle(id) { openRiddle(id); },
   jellyTalk() { return jellyTalk(); },
+  k9Talk(id) { return k9Talk(id); },
   startClimb() { startClimb(); },
 };
 
@@ -409,6 +413,11 @@ function update(dt) {
       } else if (game.endChapter === 7) {
         goTo('arena', ARENA_SPAWN.x, ARENA_SPAWN.y, ARENA_SPAWN.dir);
         fx.banner('KAPITEL 8', 'Der Drache vom Buttenberg', '#ff6040');
+      } else if (game.endChapter === 9) {
+        const L = leader();
+        L.x = 15 * TILE; L.y = 18 * TILE; L.dir = 0;
+        regroup();
+        save();
       } else if (game.endChapter === 8) {
         goTo('village', 15 * TILE + 8, 4 * TILE, 0);
         homecoming();
@@ -459,6 +468,7 @@ function update(dt) {
   updateBomberRespawn(dt);
   updateDwarf();
   updateFissures(dt);
+  updateK9();
   checkPickups();
   checkKonrad();
   checkAreas();
@@ -492,7 +502,7 @@ const PAUSE_API = {
   code: () => encodeCode(snapshot(game)),
   enterCode() {
     let input;
-    try { input = window.prompt('Speichercode eingeben (24 Zeichen):'); } catch { input = null; }
+    try { input = window.prompt('Speichercode eingeben (28 Zeichen):'); } catch { input = null; }
     if (input == null) return { ok: false, text: 'Eingabe hier nicht möglich? Spiel direkt öffnen.' };
     const d = decodeCode(input);
     if (!d) { sfx.bump(); return { ok: false, text: 'Der Code stimmt nicht. Bitte genau prüfen!' }; }
@@ -527,11 +537,14 @@ function fromCode(c) {
     mountain: MOUNTAIN_SPAWN, lair: LAIR_SPAWN, dwarf: DWARF_SPAWN,
     maze1: MAZE1_SPAWN, maze2: MAZE1_SPAWN, maze3: MAZE1_SPAWN, arena: ARENA_SPAWN,
     cliff: { x: 2 * TILE, y: 7 * TILE, dir: 3 }, ruehrberg: RUEHRBERG_SPAWN,
+    kshop: KLEIN_SPAWN, kleinfeld: KLEIN_SPAWN,
   }[c.mapId];
   const dugCells = [];
   if (c.cave.dug) dugCells.push('15,17');
   if (c.cave.secret) dugCells.push('11,19');
   if (c.mapId === 'maze2' || c.mapId === 'maze3') c = { ...c, mapId: 'maze1' };
+  if (c.mapId === 'kshop' || c.mapId === 'kcellar') c = { ...c, mapId: 'kleinfeld' };
+  if (c.mapId === 'fhouse') c = { ...c, mapId: 'village' };
   return {
     v: 1, mapId: c.mapId, x: pos.x, y: pos.y, dir: pos.dir, party,
     stats: { level: c.level, xp: c.xp, maxHearts, hearts: maxHearts },
@@ -541,6 +554,7 @@ function fromCode(c) {
     mtn: { ...(c.mtn || {}), taken: [] },
     dw: { ...(c.dw || {}), taken: [] },
     lab: { ...(c.lab || {}), taken: [] }, drg: { ...(c.drg || {}) }, climb: { ...(c.climb || {}) },
+    k9: { stage: 0, back: false, ...(c.k9 || {}), taken: [] },
     starter, rec, mama, hasCloak: c.hasCloak || mama === 2,
     quizIntro: true, seenHints: { felixTalk: true },
   };
@@ -585,6 +599,7 @@ export const CHAPTERS = [
   { n: 6, name: 'Das Tor zum Drachenhort' },
   { n: 7, name: 'Die drei Labyrinthe' },
   { n: 8, name: 'Der Drache vom Buttenberg' },
+  { n: 9, name: 'Kleinfeld' },
 ];
 
 // Startet ein Kapitel mit allem, was man bis dahin normalerweise hätte
@@ -611,6 +626,7 @@ function startChapter(n, starter = 'theo') {
       mtn: { statue: true, wall: true, rocks: true, key: true, boss: true, jelly: true, done: true }, dw: dwDone,
       lab: { gate: n === 8, done: n === 8 } });
   }
+  if (n === 9) Object.assign(preset, { mapId: 'village', level: 14, diamonds: 60, lab: { gate: true, done: true }, drg: { won: true }, owned: { ...preset.owned, heart: 3 } });
   newGame(starter);
   applySave(fromCode({ step: 7, hasCloak: true, owned: allBasic, ammo: 30, xp: 0, valley: {}, starter, ...preset }));
   game.titleCache = null;
@@ -735,6 +751,7 @@ function interact() {
   }
 
   if (m.id === 'dwarf' && dwarfInteract(tx, ty)) return;
+  if (k9Interact(m, tx, ty)) return;
   if (m.id === 'cliff' && m.wall.some(([x, y]) => x === tx && y === ty)) {
     if (game.climb.done) { goTo('ruehrberg', RUEHRBERG_SPAWN.x, RUEHRBERG_SPAWN.y, RUEHRBERG_SPAWN.dir); sfx.confirm(); return; }
     if (!m.npcs.some((n) => n.id === 'mama')) { dialog.open(['Ohne Sicherung ist das viel zu gefährlich! Mama kommt bestimmt mit.']); return; }
@@ -813,6 +830,17 @@ function interact() {
 function pullLever() {
   const m = map();
   if (m.lever.pulled) { dialog.open(['Der Hebel ist schon umgelegt.']); return; }
+  if (m.id === 'kleinfeld') {
+    m.lever.pulled = true;
+    m.openGate();
+    game.k9.stage = Math.max(game.k9.stage, 3);
+    sfx.door();
+    burst(3 * TILE + 8, 19 * TILE + 8, ['#7a7488', '#4a4458', '#ffffff'], 20, 60);
+    fx.banner('DIE MAUER IST OFFEN', 'Unten links – der Schlüsselraum!', '#a8f070');
+    fx.gainXP(10);
+    save();
+    return;
+  }
   if (m.id === 'valley') {
     m.openGate();
     game.valley.lever = true;
@@ -1549,7 +1577,7 @@ function checkPickups() {
     const st = game.stats;
     if (it.type === 'apple' && st.hearts >= st.maxHearts) continue;
     it.taken = true;
-    if (!it.drop) ({ haunted: game.haunt.taken, valley: game.valley.taken, under: game.valley.taken, mountain: game.mtn.taken, lair: game.mtn.taken, dwarf: game.dw.taken, maze1: game.lab.taken, maze2: game.lab.taken, maze3: game.lab.taken }[m.id] || game.cave.taken).push(it.id);
+    if (!it.drop) ({ haunted: game.haunt.taken, valley: game.valley.taken, under: game.valley.taken, mountain: game.mtn.taken, lair: game.mtn.taken, dwarf: game.dw.taken, maze1: game.lab.taken, maze2: game.lab.taken, maze3: game.lab.taken, kshop: game.k9.taken, kleinfeld: game.k9.taken }[m.id] || game.cave.taken).push(it.id);
     sfx.item();
     switch (it.type) {
       case 'crystal': game.diamonds += 2; fx.toast('Ein Kristall! +2 Diamanten', 2.5); break;
@@ -1559,7 +1587,8 @@ function checkPickups() {
         game.ammo += 10;
         fx.toast(game.owned.sling ? '+10 Kastanien für Felix!' : '+10 Kastanien – mit einer Schleuder könnte Felix sie werfen.', 3);
         break;
-      case 'key': if (m.id === 'mountain') { game.mtn.key = true; fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in eine Tür ganz oben am Berg', '#f8d848'); break; }
+      case 'key': if (m.id === 'kleinfeld') { game.k9.stage = Math.max(game.k9.stage, 4); fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in die Tür am Ausgang', '#f8d848'); break; }
+        if (m.id === 'mountain') { game.mtn.key = true; fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in eine Tür ganz oben am Berg', '#f8d848'); break; }
         if (m.id === 'under') { game.valley.key = true; fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in die Felsentür im Tal', '#f8d848'); break; }
         game.cave.key = true; fx.banner('SCHLÜSSEL GEFUNDEN', 'Er passt in die Schlosstür in der Halle', '#f8d848'); break;
     }
@@ -1621,6 +1650,11 @@ function checkWarps() {
     endInvisibility(true);
     if (!game.dw.done) { game.dw.done = true; regroup(); endChapter(6); }
     else goTo('maze1', MAZE1_SPAWN.x, MAZE1_SPAWN.y, MAZE1_SPAWN.dir);
+    return;
+  }
+  if (m.id === 'kleinfeld' && m.tile(tx, ty) === T.DOWN) {
+    if (game.k9.stage < 6) { game.k9.stage = 6; endChapter(9); }
+    else { L.y -= 12; regroup(); fx.toast('Fortsetzung folgt: Das Monster von Kleinfeld!', 3); }
     return;
   }
   if (m.id === 'maze3' && ty >= 25) {
@@ -2391,6 +2425,116 @@ function renderEnd8() {
   if (game.endT > 1.5 && Math.floor(game.time * 2) % 2 === 0) text('A: Heim nach Lindental', W / 2, 138, { size: 6, align: 'center', color: '#a8f070' });
 }
 
+// --- Kapitel 9: Kleinfeld --------------------------------------------------------------------
+
+function applyK9() {
+  const k = game.k9, v = game.maps.village, kc = game.maps.kcellar, kl = game.maps.kleinfeld, ks = game.maps.kshop;
+  if (k.stage >= 2) { kc.setTile(7, 5, T.WOOD); kl.npcs.find((n) => n.id === 'papa').dir = 0; }
+  if (k.stage >= 3) { kl.lever.pulled = true; kl.openGate(); kl.setTile(22, 8, T.CFLOOR); }
+  if (k.stage >= 4) for (const it of kl.items) if (it.type === 'key') it.taken = true;
+  if (k.stage >= 5) kl.setTile(...kl.exitDoor, T.CFLOOR);
+  if (k.back) ks.setTile(...ks.backDoor, T.WOOD);
+  for (const m of [kl, ks]) for (const it of m.items) if ((k.taken || []).includes(it.id)) it.taken = true;
+  void v;
+}
+
+function resetCrates() {
+  const m = game.maps.kcellar;
+  for (let y = 1; y <= 6; y++) for (let x = 1; x <= 9; x++) if (m.tile(x, y) === T.BOULDER) m.setTile(x, y, T.WOOD);
+  for (const [x, y] of m.crates) m.setTile(x, y, T.BOULDER);
+  sfx.door();
+  fx.toast('Rumpel! Alle Kisten stehen wieder am Anfang.', 2);
+}
+
+// Liefert true, wenn etwas zu Kapitel 9 benutzt wurde
+function k9Interact(m, tx, ty) {
+  const k = game.k9;
+  const ferd = HEROES.ferdinand.name;
+  if (m.id === 'village') {
+    const fountain = tx >= 15 && tx <= 16 && ty >= 12 && ty <= 13;
+    if (fountain && game.drg.won && k.stage < 1) {
+      k.stage = 1;
+      sfx.item();
+      fx.banner('EIN SCHLÜSSEL!', 'Er lag im Dorfbrunnen', '#f8d848');
+      dialog.open([
+        'Da glitzert etwas im Brunnen ... ein alter Schlüssel!',
+        `${ferd}: Moment mal! Das ist ja der Schlüssel für mein Haus!`,
+        `${ferd}: Den hab ich seit dem Sturm gesucht. Kommt mit – bei mir im Keller ist was Komisches ...`,
+      ]);
+      save();
+      return true;
+    }
+    if (tx === 24 && ty === 7 && k.stage >= 1 && game.rec.ferdinand) {
+      sfx.door();
+      goTo('fhouse', 7 * TILE, 8 * TILE - 4, 1);
+      return true;
+    }
+  }
+  if (m.id === 'kcellar' && m.reset.x === tx && m.reset.y === ty) { resetCrates(); return true; }
+  if (m.id === 'kshop' && m.backDoor[0] === tx && m.backDoor[1] === ty && m.tile(tx, ty) === T.LOCKED) {
+    dialog.open(['Das Hinterzimmer ist abgeschlossen. Vielleicht hat der Verkäufer einen Schlüssel?']);
+    return true;
+  }
+  if (m.id === 'kleinfeld' && m.exitDoor[0] === tx && m.exitDoor[1] === ty && m.tile(tx, ty) === T.LOCKED) {
+    if (k.stage >= 4) {
+      m.setTile(tx, ty, T.CFLOOR);
+      k.stage = Math.max(k.stage, 5);
+      sfx.door();
+      fx.toast('Der Schlüssel passt! Die Tür zum Ausgang ist offen.', 3);
+      save();
+    } else dialog.open(['Eine schwere, verschlossene Tür. Dahinter führt eine Treppe nach unten.', 'Der Schlüssel liegt bestimmt irgendwo in Kleinfeld ...']);
+    return true;
+  }
+  return false;
+}
+
+function k9Talk(id) {
+  if (id === 'kseller1') {
+    if (game.k9.back) return { lines: ['Verkäuferin: Na, war was Schönes im Hinterzimmer?'] };
+    return {
+      lines: [
+        'Verkäuferin: Kinder aus Lindental?! Durch den Keller? Na so was.',
+        'Verkäuferin: Im Hinterzimmer liegt noch Ware. Den Schlüssel bekommt, wer drei Fragen hintereinander richtig beantwortet!',
+      ],
+      after() { openRiddle('kshop'); },
+    };
+  }
+  if (id === 'kseller2') return { lines: ['Verkäufer: Willkommen! Bei mir gibt es alles, was Helden brauchen.'], after() { fx.openShop(); } };
+  if (id === 'papa') return { lines: [
+    'Papa: Gut, dass ihr da seid! Bleibt zusammen.',
+    'Papa: Das Monster soll hinter der verschlossenen Tür im Süden hausen. Der Schlüssel muss irgendwo hier in Kleinfeld sein.',
+  ] };
+  return null;
+}
+
+function updateK9() {
+  const k = game.k9;
+  if (game.mapId === 'kleinfeld' && k.stage < 2 && !dialog.active && !game.ui) {
+    k.stage = 2;
+    const papa = map().npcs.find((n) => n.id === 'papa');
+    papa.dir = 2;
+    sfx.confirm();
+    fx.banner('KAPITEL 9', 'Kleinfeld', '#ffb040');
+    dialog.open([
+      'Papa: Hallo ihr! Was macht ihr denn hier in Kleinfeld?',
+      `${HEROES[leader().id].name}: Papa?! Wir kommen durch den Tunnel aus ${HEROES.ferdinand.name}s Keller!`,
+      'Papa: Hört zu, in Kleinfeld wütet ein Monster! Die Leute trauen sich kaum noch auf die Straße.',
+      'Papa: Es haust irgendwo hinter der verschlossenen Tür im Süden. Ihr habt doch den Drachen besiegt – vielleicht schafft ihr das auch?',
+    ]);
+    save();
+  }
+}
+
+function renderEnd9() {
+  const st = game.stats, items = [...game.maps.kshop.items, ...game.maps.kleinfeld.items].filter((i) => i.type === 'crystal');
+  text('ENDE KAPITEL 9', W / 2, 18, { size: 12, align: 'center', color: '#f8d848' });
+  text('Die Tür zum Monster von Kleinfeld ist offen ...', W / 2, 40, { size: 6, align: 'center' });
+  [['Kristalle', `${items.filter((i) => i.taken).length} / ${items.length}`], ['Diamanten', String(game.diamonds)], ['Level', String(st.level)]]
+    .forEach(([a, b], i) => { text(a, 40, 60 + i * 11, { size: 6, color: '#b8c8e8' }); text(b, 200, 60 + i * 11, { size: 6, align: 'right', color: '#a8f070' }); });
+  text('Fortsetzung folgt: Das Monster von Kleinfeld', W / 2, 120, { size: 6, align: 'center', color: '#ff9060' });
+  if (game.endT > 1.5 && Math.floor(game.time * 2) % 2 === 0) text('A: Weiterspielen', W / 2, 138, { size: 6, align: 'center', color: '#a8f070' });
+}
+
 function endChapter(n) {
   game.endChapter = n;
   game.state = 'end';
@@ -2425,6 +2569,20 @@ function openRiddle(id) {
         fx.banner('THEO IST DABEI', 'B: Schutzschild (Laden)', '#a8f070');
         fx.gainXP(15);
         dialog.open(['Theo: Bestanden! Okay, ich komme mit. Und meine Karten auch!']);
+      } });
+    return;
+  }
+  if (id === 'kshop') {
+    game.ui = new RiddleUI(game, fx, { speaker: 'Verkäuferin', need: 3,
+      gen: () => nextQuestion(['de', 'en', 'geo', 'ma'][Math.floor(Math.random() * 4)]),
+      onSolved() {
+        game.k9.back = true;
+        const ks = game.maps.kshop;
+        ks.setTile(...ks.backDoor, T.WOOD);
+        sfx.door();
+        fx.banner('DAS HINTERZIMMER IST OFFEN', 'Bedient euch!', '#a8f070');
+        fx.gainXP(10);
+        save();
       } });
     return;
   }
@@ -3130,6 +3288,7 @@ function renderEnd() {
   if (game.endChapter === 6) return renderEnd6();
   if (game.endChapter === 7) return renderEnd7();
   if (game.endChapter === 8) return renderEnd8();
+  if (game.endChapter === 9) return renderEnd9();
   const st = game.stats, c = game.maps.cave, cv = game.cave;
   const crystals = c.items.filter((i) => i.type === 'crystal' && i.taken).length;
   text('ENDE KAPITEL 2', W / 2, 18, { size: 12, align: 'center', color: '#f8d848' });

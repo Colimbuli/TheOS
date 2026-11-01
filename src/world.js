@@ -154,7 +154,7 @@ function variant(world, tx, ty, t, frame) {
     case T.LFLOOR: return hash(tx, ty) % 4;
     case T.LAVA: return frame % 2;
     case T.FISSURE: return frame % 2;
-    case T.PIT: return world.theme === 'cave' ? 1 : world.theme === 'lava' ? 2 : 0;
+    case T.PIT: return world.theme === 'cave' ? 1 : world.theme === 'lava' ? 2 : world.theme === 'inside' ? 3 : 0;
     case T.CWALL: case T.EWALL: {
       // Wandfront, wenn darunter begehbarer Boden liegt
       const below = tl(tx, ty + 1);
@@ -166,7 +166,7 @@ function variant(world, tx, ty, t, frame) {
       const r = (x, y) => tl(x, y) === T.RUG;
       return (r(tx, ty - 1) ? 0 : 1) | (r(tx + 1, ty) ? 0 : 2) | (r(tx, ty + 1) ? 0 : 4) | (r(tx - 1, ty) ? 0 : 8);
     }
-    case T.BOULDER: return world.theme === 'cave' ? 1 : world.theme === 'haunted' ? 2 : world.theme === 'lava' ? 3 : 0;
+    case T.BOULDER: return world.theme === 'cave' ? 1 : world.theme === 'haunted' || world.theme === 'inside' ? 2 : world.theme === 'lava' ? 3 : 0;
     case T.BARS: case T.LOCKED: case T.CRACK: return world.theme === 'valley' ? 1 : 0;
     case T.CLIFF: {
       const isC = (x, y) => { const n = tl(x, y); return n === T.CLIFF || n === T.LOCKED || n === T.BARS || n === T.CAVEIN || n === T.TREE; };
@@ -198,6 +198,7 @@ function baseTile(world, t) {
   if (world.theme === 'cave') return T.CFLOOR;
   if (world.theme === 'lava') return T.LFLOOR;
   if (world.theme === 'inside' || (world.theme === 'haunted' && t === T.BOULDER)) return T.WOOD;
+  if (world.theme === 'town' && t === T.BOULDER) return T.CFLOOR;
   return T.GRASS;
 }
 
@@ -720,7 +721,7 @@ const PAINT = {
   },
 
   [T.PIT](g, v) {
-    if (v === 1) PAINT[T.CFLOOR](g, 0); else if (v === 2) PAINT[T.LFLOOR](g, 0); else paintGrass(g, 2);
+    if (v === 1) PAINT[T.CFLOOR](g, 0); else if (v === 2) PAINT[T.LFLOOR](g, 0); else if (v === 3) PAINT[T.WOOD](g); else paintGrass(g, 2);
     blob(g, 8, 9, 6.8, 5.8, (d, dx, dy) => (d > 0.8 ? (dy < 0 ? '#2a1a10' : '#6e5a48') : dy < -0.1 ? '#050302' : '#140c08'));
   },
 
@@ -1267,4 +1268,36 @@ export function drawRuneGate(g, o, cx, cy, t) {
     if (i > 2) px(g, c, sx + 6, Y + 4, 1, 3);
     if (lit && Math.floor(t * 3 + i) % 3 === 0) px(g, '#ffffff', sx + 1, Y + 3, 1, 1);
   });
+}
+
+// --- Kleinfeld --------------------------------------------------------------------------
+
+// Parkplatz: weiße Linien auf dem Asphalt
+export function drawParking(g, o, cx, cy) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  for (let i = 0; i <= o.w; i++) px(g, '#e8e8f0', X + i * TILE, Y + 2, 1, o.h * TILE - 4);
+  px(g, '#e8e8f0', X, Y + o.h * TILE - 2, o.w * TILE, 1);
+}
+
+// Mauer (kreuzschraffiert) – verschwindet, wenn der Hebel umgelegt ist
+export function drawWallBlock(g, o, cx, cy) {
+  if (o.hidden) return;
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy, w = (o.w || 1) * TILE;
+  px(g, '#2a2430', X, Y - 6, w, 22);
+  px(g, '#7a7488', X + 1, Y - 5, w - 2, 20);
+  for (let i = -16; i < w + 16; i += 5) for (let k = 0; k < 20; k++) {
+    const a = i + k, b = i + 20 - k;
+    if (a >= 1 && a < w - 1) px(g, '#4a4458', X + a, Y - 5 + k, 1, 1);
+    if (b >= 1 && b < w - 1) px(g, '#4a4458', X + b, Y - 5 + k, 1, 1);
+  }
+}
+
+// Großes Ladenschild (senkrecht, wie auf Theos Karte)
+export function drawShopSign(g, o, cx, cy) {
+  const X = o.x * TILE - cx, Y = o.y * TILE - cy;
+  px(g, COL.out, X + 2, Y, 12, 58);
+  px(g, '#f8d848', X + 3, Y + 1, 10, 56);
+  const L = { L: ['1000', '1000', '1000', '1111'], A: ['0110', '1001', '1111', '1001'], D: ['1110', '1001', '1001', '1110'],
+    E: ['1111', '1110', '1000', '1111'], N: ['1001', '1101', '1011', '1001'] };
+  [...'LADEN'].forEach((ch, i) => L[ch].forEach((row, y) => [...row].forEach((b, x) => { if (b === '1') px(g, '#c8381a', X + 5 + x * 2, Y + 3 + i * 11 + y * 2, 2, 2); })));
 }

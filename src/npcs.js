@@ -86,6 +86,13 @@ const LOTTE_TIPS = {
 
 export function questHint(game) {
   if (game.mapId === 'dwarf') return dwarfHint(game);
+  if (game.mapId === 'fhouse') return 'Quest: Hinunter in den Keller';
+  if (game.mapId === 'kcellar') return 'Quest: Schiebt die Kisten weg (Felix)';
+  if (game.mapId === 'kshop') return game.k9.back ? 'Ziel: Raus nach Kleinfeld' : 'Tipp: Die Verkäuferin hat einen Schlüssel';
+  if (game.mapId === 'kleinfeld') {
+    const k = game.k9.stage;
+    return k < 3 ? 'Quest: Findet den Hebel (hinter der Erdmauer)' : k < 4 ? 'Quest: Holt den Schlüssel (unten links)' : k < 5 ? 'Quest: Öffnet die Tür zum Ausgang' : 'Ziel: Die Treppe im Süden';
+  }
   if (game.mapId === 'cliff') return game.climb.done ? 'Ziel: Am Seil hoch nach Rührberg' : 'Quest: Klettert die Felswand hoch (Mama sichert)';
   if (game.mapId === 'ruehrberg') return 'Rührberg – hier wird noch gebaut';
   if (game.mapId === 'maze1') return 'Quest: Findet den Weg durch den Wald';
@@ -96,6 +103,8 @@ export function questHint(game) {
   if (game.mapId === 'valley' || game.mapId === 'under') return valleyHint(game);
   if (game.mapId === 'haunted') return hauntHint(game);
   if (game.mapId === 'cave' || game.step >= 7 && game.mapId !== 'village') return caveHint(game);
+  if (game.drg && game.drg.won && game.k9.stage < 1) return 'Quest: Im Dorfbrunnen glitzert etwas ...';
+  if (game.drg && game.drg.won && game.k9.stage < 2) return `Quest: In ${HEROES.ferdinand.name}s Haus (Osten)`;
   if (game.drg && game.drg.won) return game.climb.done ? 'Frei! Besucht Rührberg (Osten)' : 'Neu: Der Weg nach Rührberg (Osten)';
   if (game.step >= 7) return 'Ziel: Die Höhle im Buttenberg (Norden)';
   return villageGoal(game);
@@ -263,6 +272,9 @@ export function talkTo(n, game, fx) {
         'Bürgermeisterin Kneter: Willkommen in Rührberg. Wir bauen hier gerade noch alles auf ...',
         'Bürgermeisterin Kneter: Kommt bald wieder – dann gibt es hier ein neues Abenteuer!',
       ] };
+
+    case 'kseller1': case 'kseller2': case 'papa':
+      return fx.k9Talk(n.id);
 
     case 'ruehr_kid':
       return { lines: ['Junge: Ihr habt den Drachen besiegt? Echt jetzt?! Erzählt mal!'] };
